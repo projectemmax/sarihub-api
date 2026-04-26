@@ -13,7 +13,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:4200', // Angular local
-      'https://your-frontend-domain.com', // replace later
+      'https://ecommerce-frontend-clean.vercel.app'
     ],
     credentials: true,
   });  
