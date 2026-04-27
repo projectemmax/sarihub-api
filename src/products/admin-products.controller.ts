@@ -81,51 +81,20 @@ export class AdminProductsController {
 
     // POST /api/admin/products/:id/image
     @Post(':id/image')
-    @UseInterceptors(
-    FileInterceptor('image', {
-        storage: diskStorage({
-            destination: './uploads/products',
-            filename: (req, file, cb) => {
-                const uniqueName =
-                Date.now() + '-' + Math.round(Math.random() * 1e9);
-                const extension = extname(file.originalname);
-                cb(null, `${uniqueName}${extension}`);
-            },
-        }),
-
-        // ✅ FILE SIZE LIMIT (5MB example)
-        limits: {
-            fileSize: 5 * 1024 * 1024, // 5MB
-        },
-
-        // ✅ FILE TYPE VALIDATION
-        fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpg|jpeg|png|webp/;
-        const ext = extname(file.originalname).toLowerCase();
-        const mime = file.mimetype;
-
-        if (
-            allowedTypes.test(ext) &&
-            allowedTypes.test(mime)
-        ) {
-            cb(null, true);
-        } else {
-            cb(
-            new BadRequestException(
-                'Only JPG, JPEG, PNG, WEBP images are allowed',
-            ),
-            false,
-            );
-        }
-        },
-    }),
-    )
-    uploadImage(
-    @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UseInterceptors(FileInterceptor('image')) // no diskStorage
+    async uploadImage(
+        @Param('id') id: string,
+        @UploadedFile() file: Express.Multer.File,
     ) {
         return this.productsService.uploadProductImage(id, file);
     }
+
+    // uploadImage(
+    // @Param('id') id: string,
+    // @UploadedFile() file: Express.Multer.File,
+    // ) {
+    //     return this.productsService.uploadProductImage(id, file);
+    // }
 
     @Post('upload')
     @UseInterceptors(FileInterceptor('file', {
