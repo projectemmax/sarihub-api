@@ -127,4 +127,18 @@ export class AdminProductsController {
         await this.productsService.hardDeleteProduct(id);
     }
 
+    @Post(':id/variants/:variantId/upload')
+    @UseInterceptors(FileInterceptor('file'))
+    uploadVariantImage(
+        @Param('id') productId: string,
+        @Param('variantId') variantId: string,
+        @UploadedFile() file: Express.Multer.File
+    ) {
+        return this.productsService.uploadVariantImage(
+            productId,
+            variantId,
+            file
+        );
+    }
+
 }

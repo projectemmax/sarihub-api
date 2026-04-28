@@ -2,10 +2,11 @@
 /* eslint-disable prettier/prettier */
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
 
 @Injectable()
 export class ProductsService {
-    constructor(private prisma: PrismaService) {}
+    constructor(private prisma: PrismaService, private cloudinaryService: CloudinaryService) {}
 
     private generateSlug(name: string): string {
         return name
@@ -381,8 +382,8 @@ export class ProductsService {
         const existing = await this.prisma.product.findUnique({
             where: { id },
             include: {
-            variants: true,
-            images: true,
+                variants: true,
+                images: true,
             },
         });
 
@@ -413,8 +414,8 @@ export class ProductsService {
             variantOptions === undefined
         ) {
             return this.prisma.product.update({
-            where: { id },
-            data: { status },
+                where: { id },
+                data: { status },
             });
         }
 
@@ -450,51 +451,51 @@ export class ProductsService {
             // ==========================
             if (variants !== undefined) {
 
-            const existingVariantIds = existing.variants.map(v => v.id);
-            const incomingVariantIds = variants
-                .filter((v: any) => v.id)
-                .map((v: any) => v.id);
+                const existingVariantIds = existing.variants.map(v => v.id);
+                const incomingVariantIds = variants
+                    .filter((v: any) => v.id)
+                    .map((v: any) => v.id);
 
-            const variantsToDelete = existingVariantIds.filter(
-                id => !incomingVariantIds.includes(id)
-            );
+                const variantsToDelete = existingVariantIds.filter(
+                    id => !incomingVariantIds.includes(id)
+                );
 
-            const variantsToUpdate = variants.filter((v: any) => v.id);
-            const variantsToCreate = variants.filter((v: any) => !v.id);
+                const variantsToUpdate = variants.filter((v: any) => v.id);
+                const variantsToCreate = variants.filter((v: any) => !v.id);
 
-            // DELETE removed
-            if (variantsToDelete.length) {
-                await tx.productVariant.deleteMany({
-                where: { id: { in: variantsToDelete } },
-                });
-            }
+                // DELETE removed
+                if (variantsToDelete.length) {
+                    await tx.productVariant.deleteMany({
+                    where: { id: { in: variantsToDelete } },
+                    });
+                }
 
-            // UPDATE existing
-            for (const v of variantsToUpdate) {
-                await tx.productVariant.update({
-                where: { id: v.id },
-                data: {
-                    price: Number(v.price),
-                    stock: Number(v.stock),
-                    attributes: v.attributes,
-                    image: v.image || null,
-                },
-                });
-            }
+                // UPDATE existing
+                for (const v of variantsToUpdate) {
+                    await tx.productVariant.update({
+                    where: { id: v.id },
+                    data: {
+                        price: Number(v.price),
+                        stock: Number(v.stock),
+                        attributes: v.attributes,
+                        image: v.image || null,
+                    },
+                    });
+                }
 
-            // CREATE new
-            if (variantsToCreate.length) {
-                await tx.productVariant.createMany({
-                data: variantsToCreate.map((v: any) => ({
-                    productId: id,
-                    sku: v.sku,
-                    price: Number(v.price),
-                    stock: Number(v.stock),
-                    attributes: v.attributes,
-                    image: v.image || null,
-                })),
-                });
-            }
+                // CREATE new
+                if (variantsToCreate.length) {
+                    await tx.productVariant.createMany({
+                        data: variantsToCreate.map((v: any) => ({
+                            productId: id,
+                            sku: v.sku,
+                            price: Number(v.price),
+                            stock: Number(v.stock),
+                            attributes: v.attributes,
+                            image: v.image || null,
+                        })),
+                    });
+                }
             }
 
             // ==========================
@@ -502,48 +503,48 @@ export class ProductsService {
             // ==========================
             if (images !== undefined) {
 
-            const existingImageIds = existing.images.map(i => i.id);
-            const incomingImageIds = images
-                .filter((i: any) => i.id)
-                .map((i: any) => i.id);
+                const existingImageIds = existing.images.map(i => i.id);
+                const incomingImageIds = images
+                    .filter((i: any) => i.id)
+                    .map((i: any) => i.id);
 
-            const imagesToDelete = existingImageIds.filter(
-                id => !incomingImageIds.includes(id)
-            );
+                const imagesToDelete = existingImageIds.filter(
+                    id => !incomingImageIds.includes(id)
+                );
 
-            const imagesToUpdate = images.filter((i: any) => i.id);
-            const imagesToCreate = images.filter((i: any) => !i.id);
+                const imagesToUpdate = images.filter((i: any) => i.id);
+                const imagesToCreate = images.filter((i: any) => !i.id);
 
-            // DELETE removed
-            if (imagesToDelete.length) {
-                await tx.productImage.deleteMany({
-                where: { id: { in: imagesToDelete } },
-                });
-            }
+                // DELETE removed
+                if (imagesToDelete.length) {
+                    await tx.productImage.deleteMany({
+                    where: { id: { in: imagesToDelete } },
+                    });
+                }
 
-            // UPDATE existing
-            for (const img of imagesToUpdate) {
-                await tx.productImage.update({
-                where: { id: img.id },
-                data: {
-                    url: img.url,
-                    isPrimary: img.isPrimary,
-                    order: img.order,
-                },
-                });
-            }
+                // UPDATE existing
+                for (const img of imagesToUpdate) {
+                    await tx.productImage.update({
+                        where: { id: img.id },
+                        data: {
+                            url: img.url,
+                            isPrimary: img.isPrimary,
+                            order: img.order,
+                        },
+                    });
+                }
 
-            // CREATE new
-            if (imagesToCreate.length) {
-                await tx.productImage.createMany({
-                data: imagesToCreate.map((img: any, index: number) => ({
-                    productId: id,
-                    url: img.url,
-                    isPrimary: img.isPrimary,
-                    order: img.order ?? index,
-                })),
-                });
-            }
+                // CREATE new
+                if (imagesToCreate.length) {
+                    await tx.productImage.createMany({
+                        data: imagesToCreate.map((img: any, index: number) => ({
+                            productId: id,
+                            url: img.url,
+                            isPrimary: img.isPrimary,
+                            order: img.order ?? index,
+                        })),
+                    });
+                }
             }
 
             return product;
@@ -632,11 +633,12 @@ export class ProductsService {
             throw new BadRequestException('Image is required');
         }
 
-        const imageUrl = `/uploads/products/${file.filename}`;
+        // Upload to Cloudinary
+        const uploaded = await this.cloudinaryService.uploadImage(file, { folder: 'products' });
 
         return this.prisma.product.update({
             where: { id },
-            data: { imageUrl },
+            data: { imageUrl: uploaded.url }, // ✅ SAVE FULL URL
         });
     }
 
@@ -661,6 +663,25 @@ export class ProductsService {
         });
 
         return { data: !!purchase };
+    }
+
+    async uploadVariantImage(
+        productId: string,
+        variantId: string,
+        file: Express.Multer.File
+    ) {
+        if (!file) throw new BadRequestException('Image required');
+
+        const uploaded = await this.cloudinaryService.uploadImage(file, {
+            folder: `products/${productId}/variants`,
+            public_id: variantId, // 🔥 IMPORTANT
+            overwrite: true
+        });
+
+        return {
+            public_id: uploaded.publicId,
+            url: uploaded.url
+        };
     }
 
 }
