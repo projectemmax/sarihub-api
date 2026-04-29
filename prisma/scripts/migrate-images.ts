@@ -1,69 +1,90 @@
 import { PrismaClient } from '@prisma/client';
-import { v2 as cloudinary } from 'cloudinary';
 
-const prisma = new PrismaClient();
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
-  api_key: process.env.CLOUDINARY_API_KEY!,
-  api_secret: process.env.CLOUDINARY_API_SECRET!,
+const local = new PrismaClient({
+  datasources: { db: { url: process.env.LOCAL_DATABASE_URL } },
 });
 
-async function migrate() {
-  console.log('🚀 Starting image migration...');
+const prod = new PrismaClient({
+  datasources: { db: { url: process.env.PROD_DATABASE_URL } },
+});
 
-  const images = await prisma.productImage.findMany();
+async function syncImages() {
+  console.log('🚀 Syncing ProductImage (LOCAL → PROD)');
 
-  console.log(`Found ${images.length} images`);
+  const localImages = await local.productImage.findMany({
+    include: { product: true }, // 🔥 REQUIRED to access slug
+  });
 
-  let migrated = 0;
+  let created = 0;
+  let updated = 0;
   let skipped = 0;
-  let failed = 0;
 
-  for (const img of images) {
+  for (const img of localImages) {
     try {
-      // ✅ Skip already migrated
-      if (img.url.startsWith('http')) {
+      // skip non-cloudinary / invalid URLs
+      if (!img.url || !img.url.startsWith('http')) {
         skipped++;
         continue;
       }
 
-      if (!img.url) {
-        console.log(`⚠️ Skipping empty URL (id: ${img.id})`);
-        skipped++;
-        continue;
-      }
-
-      const fullUrl = `${process.env.API_BASE_URL}${img.url}`;
-
-      console.log(`⬆️ Uploading: ${fullUrl}`);
-
-      const uploaded = await cloudinary.uploader.upload(fullUrl, {
-        folder: 'products',
-      });
-
-      await prisma.productImage.update({
-        where: { id: img.id },
-        data: {
-          url: uploaded.secure_url,
+      // 🔥 find product in prod using slug
+      const prodProduct = await prod.product.findFirst({
+        where: {
+          slug: img.product.slug,
         },
       });
 
-      console.log(`✅ Migrated: ${img.id}`);
-      migrated++;
+      if (!prodProduct) {
+        console.log(`❌ Product not found in prod: ${img.product.slug}`);
+        skipped++;
+        continue;
+      }
+
+      // check if image already exists (by product + order)
+      const existing = await prod.productImage.findFirst({
+        where: {
+          productId: prodProduct.id,
+          order: img.order,
+        },
+      });
+
+      if (existing) {
+        await prod.productImage.update({
+          where: { id: existing.id },
+          data: {
+            url: img.url,
+            isPrimary: img.isPrimary,
+          },
+        });
+
+        console.log(`🔄 Updated: ${img.product.slug} (order ${img.order})`);
+        updated++;
+      } else {
+        await prod.productImage.create({
+          data: {
+            productId: prodProduct.id,
+            url: img.url,
+            isPrimary: img.isPrimary,
+            order: img.order,
+          },
+        });
+
+        console.log(`🆕 Created: ${img.product.slug} (order ${img.order})`);
+        created++;
+      }
     } catch (err) {
-      console.error(`❌ Failed: ${img.id}`, err.message);
-      failed++;
+      console.error(`❌ Error processing ${img.product?.slug}`, err.message);
+      skipped++;
     }
   }
 
   console.log('----------------------------');
-  console.log('🎯 Migration complete');
-  console.log(`✅ Migrated: ${migrated}`);
+  console.log(`🆕 Created: ${created}`);
+  console.log(`🔄 Updated: ${updated}`);
   console.log(`⏭ Skipped: ${skipped}`);
-  console.log(`❌ Failed: ${failed}`);
 }
 
-migrate()
-  .catch((e) => console.error(e))
-  .finally(() => prisma.$disconnect());
+syncImages().finally(() => {
+  local.$disconnect();
+  prod.$disconnect();
+});

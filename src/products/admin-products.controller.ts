@@ -106,6 +106,7 @@ export class AdminProductsController {
             }
         })
     }))
+    
     uploadTemp(@UploadedFile() file: Express.Multer.File) {
         return {
             url: `/uploads/products/${file.filename}`
