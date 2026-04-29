@@ -42,12 +42,12 @@ export class CloudinaryService {
                 },
                 (error, result?: UploadApiResponse) => {
                     if (error || !result) {
-                    return reject(error || new Error('Upload failed'));
+                        return reject(error || new Error('Upload failed'));
                     }
 
                     resolve({
-                    url: result.secure_url,
-                    publicId: result.public_id
+                        url: result.secure_url,
+                        publicId: result.public_id
                     });
                 }
             );
