@@ -12,10 +12,14 @@
     "build": "nest build",
     "postinstall": "prisma generate",
     "start": "nest start",
-    "start:dev": "nest start --watch",
+
+    "start:local": "cross-env NODE_ENV=local nest start --watch",
+    "start:staging": "cross-env NODE_ENV=staging nest start --watch",
+    "start:prod": "cross-env NODE_ENV=prod node dist/main",
+
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/src/main",
-    "start:render": "npm run start:prod",
+    "start:render": "node dist/main",
+    
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

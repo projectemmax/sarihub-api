@@ -29,6 +29,7 @@ import { ScheduleModule } from '@nestjs/schedule';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: `.env.${process.env.NODE_ENV || 'local'}`,
     }),
     PrismaModule, 
     CartModule, 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-floating-promises */
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -5,6 +6,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { ConfigModule } from '@nestjs/config';
 import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
@@ -13,7 +15,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:4200', // Angular local
-      'https://ecommerce-frontend-clean.vercel.app'
+      'https://ecommerce-frontend-clean.vercel.app',
     ],
     credentials: true,
   });  
@@ -62,6 +64,10 @@ async function bootstrap() {
   );
 
   app.useGlobalInterceptors(new ResponseInterceptor());
+
+  console.log('ENV:', process.env.NODE_ENV);
+  console.log('DB:', process.env.DATABASE_URL);
+  console.log('PORT:', process.env.API_BASE_URL);
 
   await app.listen(3001);
 }
