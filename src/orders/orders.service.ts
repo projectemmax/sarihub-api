@@ -593,10 +593,12 @@ export class OrdersService {
 
         const prefix = `ORD-${y}${m}${d}`;
 
-        const latest = await this.prisma.order.findFirst({
+        for (let attempt = 0; attempt < 5; attempt++) {
+
+            const latest = await this.prisma.order.findFirst({
             where: {
                 orderNumber: {
-                    startsWith: prefix,
+                startsWith: prefix,
                 },
             },
             orderBy: {
@@ -605,14 +607,25 @@ export class OrdersService {
             select: {
                 orderNumber: true,
             },
-        });
+            });
 
-        const next =
+            const next =
             latest?.orderNumber
-            ? Number(latest.orderNumber.split('-').pop()) + 1
-            : 1;
+                ? Number(latest.orderNumber.split('-').pop()) + 1
+                : 1;
 
-        return `${prefix}-${String(next).padStart(6, '0')}`;
+            const candidate = `${prefix}-${String(next).padStart(6, '0')}`;
+
+            const exists = await this.prisma.order.findUnique({
+            where: { orderNumber: candidate },
+            });
+
+            if (!exists) {
+            return candidate;
+            }
+        }
+
+        throw new Error('Failed to generate unique order number');
     }
 
     // GET /orders/:orderId/payment-attempts
