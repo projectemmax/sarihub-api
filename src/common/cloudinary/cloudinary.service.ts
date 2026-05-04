@@ -38,7 +38,13 @@ export class CloudinaryService {
                 {
                     folder,
                     public_id,
-                    overwrite
+                    overwrite,
+
+                    transformation: [
+                        { width: 1600, crop: 'limit' },   // limit max width
+                        { quality: 'auto' },              // auto optimize quality
+                        { fetch_format: 'auto' }          // auto webp/avif
+                    ]
                 },
                 (error, result?: UploadApiResponse) => {
                     if (error || !result) {
