@@ -5,14 +5,24 @@ import {
   Get,
   Patch,
   Param,
-  Body
+  Body,
+  Post,
+  UploadedFile,
+  UseInterceptors
 } from '@nestjs/common';
 import { SiteConfigService } from './site-config.service';
 import { UpdateSiteConfigBulkDto } from './dto/update-site-config.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { CloudinaryService } from 'src/common/cloudinary/cloudinary.service';
 
 @Controller('site-config')
 export class SiteConfigController {
-    constructor(private service: SiteConfigService) {}
+    constructor(
+        private service: SiteConfigService,
+        private cloudinaryService: CloudinaryService
+    ) {}
 
     // =========================
     // PUBLIC (STORE)
@@ -28,6 +38,20 @@ export class SiteConfigController {
     @Get()
     getAllConfigs() {
         return this.service.getAllConfigs();
+    }
+
+    @Post('upload')
+    @UseInterceptors(FileInterceptor('file'))
+        async uploadFile(@UploadedFile() file: Express.Multer.File) {
+
+        const result = await this.cloudinaryService.uploadImage(file, {
+            folder: 'site-config', // 👈 separate from products
+        });
+
+        return {
+            url: result.url,
+            publicId: result.publicId
+        };
     }
 
     // =========================

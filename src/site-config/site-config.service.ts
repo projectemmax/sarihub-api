@@ -1,10 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable prettier/prettier */
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class SiteConfigService {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+    ) {}
 
     // =========================
     // PUBLIC (TRANSFORMED)
@@ -62,20 +65,61 @@ export class SiteConfigService {
     // BULK UPDATE 🔥
     // =========================
     async updateBulk(configs: { key: string; value: any }[]) {
-        return Promise.all(
-            configs.map((c) => {
-            const validatedValue = this.validateConfigValue(c.key, c.value);
 
-            return this.prisma.siteConfig.upsert({
-                where: { key: c.key },
-                update: { value: validatedValue },
-                create: {
-                    key: c.key,
-                    value: validatedValue,
+        const grouped: Record<string, any> = {};
+
+        // 🔥 STEP 1: group dot keys
+        configs.forEach(c => {
+            const parts = c.key.split('.');
+
+            if (parts.length === 1) {
+            grouped[c.key] = c.value;
+            } else {
+            const parent = parts[0];
+            const child = parts[1];
+
+            if (!grouped[parent]) grouped[parent] = {};
+            grouped[parent][child] = c.value;
+            }
+        });
+
+        // 🔥 STEP 2: process grouped updates
+        return Promise.all(
+            Object.keys(grouped).map(async (key) => {
+
+                const existing = await this.prisma.siteConfig.findUnique({
+                    where: { key }
+                });
+
+                const validatedValue = this.validateConfigValue(key, grouped[key]);
+
+                let finalValue = validatedValue;
+
+                if (
+                    typeof validatedValue === 'object' &&
+                    !Array.isArray(validatedValue)
+                ) {
+                    const existingValue =
+                    typeof existing?.value === 'object' && existing?.value !== null
+                        ? existing.value
+                        : {};
+
+                    finalValue = {
+                    ...existingValue,
+                    ...validatedValue
+                    };
+                }
+
+                return this.prisma.siteConfig.upsert({
+                    where: { key },
+                    update: { value: finalValue },
+                    create: {
+                    key,
+                    value: finalValue,
                     isPublic: true,
-                },
-            });
-            }),
+                    },
+                });
+            })
         );
     }
 
@@ -107,5 +151,6 @@ export class SiteConfigService {
 
         return value;
     }
+
 
 }

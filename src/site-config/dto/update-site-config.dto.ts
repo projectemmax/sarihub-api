@@ -1,7 +1,6 @@
 import {
   IsArray,
-  IsBoolean,
-  IsNumber,
+  IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
@@ -11,7 +10,8 @@ export class UpdateSiteConfigItemDto {
   @IsString()
   key: string;
 
-  value: string | number | boolean;
+  @IsOptional()
+  value: any; // 🔥 allow object, string, number, etc.
 }
 
 export class UpdateSiteConfigBulkDto {
