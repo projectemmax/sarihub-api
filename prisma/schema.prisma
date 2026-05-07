@@ -355,6 +355,7 @@ model Media {
   filename  String
   size      Int?
   folder    String?
+  usage     String?
   createdAt DateTime @default(now())
 
   @@index([folder])

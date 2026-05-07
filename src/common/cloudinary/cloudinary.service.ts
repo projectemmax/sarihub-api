@@ -3,20 +3,22 @@ import { Injectable } from '@nestjs/common';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import * as streamifier from 'streamifier';
 
+export interface UploadResult {
+  url: string;
+  publicId: string;
+}
+
 @Injectable()
 export class CloudinaryService {
-  constructor() {
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
-    });
+    constructor() {
+        cloudinary.config({
+            cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+            api_key: process.env.CLOUDINARY_API_KEY,
+            api_secret: process.env.CLOUDINARY_API_SECRET,
+        });
 
-    console.log('Cloudinary Config:', {
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-    });
-  }
+        console.log('Cloudinary initialized');
+    }
 
     async uploadImage(
         file: Express.Multer.File,
@@ -24,13 +26,18 @@ export class CloudinaryService {
             folder?: string;
             public_id?: string;
             overwrite?: boolean;
-        } = {}
-        ): Promise<{ url: string; publicId: string }> {
-
+            transformation?: any[];
+        } = {},
+    ): Promise<UploadResult> {
         const {
-            folder = 'products',
+            folder = 'general',
             public_id,
-            overwrite = false
+            overwrite = false,
+            transformation = [
+                { width: 1600, crop: 'limit' },
+                { quality: 'auto' },
+                { fetch_format: 'auto' },
+            ],
         } = options;
 
         return new Promise((resolve, reject) => {
@@ -39,12 +46,7 @@ export class CloudinaryService {
                     folder,
                     public_id,
                     overwrite,
-
-                    transformation: [
-                        { width: 1600, crop: 'limit' },   // limit max width
-                        { quality: 'auto' },              // auto optimize quality
-                        { fetch_format: 'auto' }          // auto webp/avif
-                    ]
+                    transformation,
                 },
                 (error, result?: UploadApiResponse) => {
                     if (error || !result) {
@@ -53,13 +55,16 @@ export class CloudinaryService {
 
                     resolve({
                         url: result.secure_url,
-                        publicId: result.public_id
+                        publicId: result.public_id,
                     });
-                }
+                },
             );
 
             streamifier.createReadStream(file.buffer).pipe(stream);
         });
     }
 
+    async deleteImage(publicId: string): Promise<void> {
+        await cloudinary.uploader.destroy(publicId);
+    }
 }

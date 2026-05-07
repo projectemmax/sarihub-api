@@ -23,6 +23,7 @@ import { AccountDashboardModule } from './account/dashboard/account-dashboard.mo
 import { SiteConfigModule } from './site-config/site-config.module';
 import { PaymentModule } from './payment/payment.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { MediaModule } from './media/media.module';
 
 
 @Module({
@@ -52,6 +53,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     SiteConfigModule,
     PaymentModule,
     ScheduleModule.forRoot(),
+    MediaModule,
   ],
   controllers: [AppController, LocationController],
   providers: [AppService, LocationService],
