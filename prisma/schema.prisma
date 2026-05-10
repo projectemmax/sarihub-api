@@ -188,6 +188,11 @@ model Order {
   returnedAt         DateTime?
   shippedAt          DateTime?
   trackingNumber     String?
+  trackingUrl        String?
+  courierName        String?
+  courierCode        String?
+  shippingMethod     String?
+  shippingStatus     ShippingStatus       @default(PENDING)
   shippingCity       String?
   shippingProvince   String?
   messageForSeller   String?
@@ -322,6 +327,15 @@ enum OrderStatus {
   DELIVERED
   COMPLETED
   CANCELLED
+  RETURNED
+}
+
+enum ShippingStatus {
+  PENDING
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  FAILED
   RETURNED
 }
 
