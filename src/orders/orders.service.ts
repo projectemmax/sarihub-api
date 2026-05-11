@@ -188,15 +188,25 @@ export class OrdersService {
             // 2️⃣ Validate stock and decrement inventory
             for (const item of cart.items) {
 
-            const updated = await tx.product.updateMany({
-                where: {
-                id: item.productId,
-                stock: { gte: item.quantity },
-                },
-                data: {
-                stock: { decrement: item.quantity },
-                },
-            });
+            const updated = item.variantId
+                ? await tx.productVariant.updateMany({
+                    where: {
+                    id: item.variantId,
+                    stock: { gte: item.quantity },
+                    },
+                    data: {
+                    stock: { decrement: item.quantity },
+                    },
+                })
+                : await tx.product.updateMany({
+                    where: {
+                    id: item.productId,
+                    stock: { gte: item.quantity },
+                    },
+                    data: {
+                    stock: { decrement: item.quantity },
+                    },
+                });
 
             if (updated.count === 0) {
                 throw new BadRequestException(
@@ -337,66 +347,78 @@ export class OrdersService {
                 where: { id: item.productId }
             });
 
+            const variant = item.variantId
+                ? await this.prisma.productVariant.findUnique({
+                    where: { id: item.variantId }
+                })
+                : null;
+
             // Product removed or discontinued
             if (!product || !product.isActive) {
                 results.skippedDiscontinued++;
                 continue;
             }
 
+            const stock = variant?.stock ?? product.stock;
+            const price = variant?.price ?? product.price;
+
             // Out of stock
-            if (product.stock <= 0) {
+            if (stock <= 0) {
                 results.skippedOutOfStock++;
                 continue;
             }
 
             // Validate quantity against stock
-            const reorderQty = Math.min(item.quantity, product.stock);
+            const reorderQty = Math.min(item.quantity, stock);
 
             // Check existing cart item
-            const existing = await this.prisma.orderItem.findUnique({
+            const existing = await this.prisma.orderItem.findFirst({
                 where: {
-                    orderId_productId: {
                     orderId: cart.id,
-                    productId: item.productId
-                    }
+                    productId: item.productId,
+                    variantId: item.variantId,
                 }
             });
 
             const newQty = existing
-            ? Math.min(existing.quantity + reorderQty, product.stock)
+            ? Math.min(existing.quantity + reorderQty, stock)
             : reorderQty;
 
             const priceChanged =
-            Number(product.price) !== Number(item.priceSnapshot);
+            Number(price) !== Number(item.priceSnapshot);
 
             if (priceChanged) {
                 results.priceChanged++;
             }
 
-            const subtotal = newQty * Number(product.price);
+            const subtotal = newQty * Number(price);
 
-            await this.prisma.orderItem.upsert({
-            where: {
-                orderId_productId: {
-                orderId: cart.id,
-                productId: item.productId
-                }
-            },
-            update: {
-                quantity: newQty,
-                priceSnapshot: product.price,
-                subtotal
-            },
-            create: {
-                orderId: cart.id,
-                productId: product.id,
-                productName: product.name,
-                productImage: product.imageUrl,
-                priceSnapshot: product.price,
-                quantity: newQty,
-                subtotal
+            if (existing) {
+                await this.prisma.orderItem.update({
+                    where: { id: existing.id },
+                    data: {
+                        quantity: newQty,
+                        priceSnapshot: price,
+                        subtotal
+                    }
+                });
+            } else {
+                await this.prisma.orderItem.create({
+                    data: {
+                        orderId: cart.id,
+                        productId: product.id,
+                        variantId: variant?.id,
+                        productName: product.name,
+                        variantName: item.variantName,
+                        variantSku: variant?.sku ?? item.variantSku,
+                        variantAttributes: item.variantAttributes as any,
+                        productImage: item.productImage ?? product.imageUrl,
+                        priceSnapshot: price,
+                        quantity: newQty,
+                        subtotal
+                    }
+                });
             }
-            });
 
             results.added++;
         }

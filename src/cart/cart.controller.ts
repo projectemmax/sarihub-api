@@ -38,16 +38,17 @@ export class CartController {
         return this.cartService.addItem(
         req.user.id,
         dto.productId,
+        dto.variantId,
         dto.quantity,
         );
     }
 
     // -------------------------
-    // DELETE /cart/items/:productId
+    // DELETE /cart/items/:orderItemId
     // -------------------------
-    @Delete('items/:productId')
-    removeItem(@Req() req: any, @Param('productId') productId: string) {
-        return this.cartService.removeItem(req.user.id, productId);
+    @Delete('items/:orderItemId')
+    removeItem(@Req() req: any, @Param('orderItemId') orderItemId: string) {
+        return this.cartService.removeItem(req.user.id, orderItemId);
     }
 
     // -------------------------

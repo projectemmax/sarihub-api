@@ -59,5 +59,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Database dumps
 *.sql
 !prisma/migrations/20260510000000_add_order_courier_fields/migration.sql
+!prisma/migrations/20260511000000_add_variant_to_order_items/migration.sql
 *.dump
 backup/

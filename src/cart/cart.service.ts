@@ -12,7 +12,9 @@ import { RedisService } from 'src/redis/redis.service';
 export type CartValidationResponse = {
   valid: boolean;
   items: {
+    orderItemId: string;
     productId: string;
+    variantId?: string | null;
     name: string;
     requestedQty: number;
     availableStock: number;
@@ -72,6 +74,20 @@ export class CartService {
 
   private calculateTotal(items: { subtotal: any }[]) {
     return items.reduce((sum, i) => sum + Number(i.subtotal), 0);
+  }
+
+  private getVariantLabel(attributes: any): string | null {
+    if (!attributes) return null;
+
+    if (Array.isArray(attributes)) {
+      return attributes.filter(Boolean).join(' / ') || null;
+    }
+
+    if (typeof attributes === 'object') {
+      return Object.values(attributes).filter(Boolean).join(' / ') || null;
+    }
+
+    return String(attributes);
   }
 
   // ================================
@@ -146,7 +162,12 @@ export class CartService {
   // ADD ITEM
   // ================================
 
-  async addItem(userId: string, productId: string, quantity: number) {
+  async addItem(
+    userId: string,
+    productId: string,
+    variantId: string | undefined,
+    quantity: number,
+  ) {
     if (quantity <= 0) {
       throw new BadRequestException('Quantity must be greater than zero');
     }
@@ -162,17 +183,37 @@ export class CartService {
                 orderBy:{ order: 'asc' },
                 take: 1,
             },
+            variants: true,
         }
       });
 
       if (!product) throw new NotFoundException('Product not found');
 
-      const existingItem = await tx.orderItem.findUnique({
+      const variant = variantId
+        ? product.variants.find((item) => item.id === variantId)
+        : null;
+
+      if (variantId && !variant) {
+        throw new BadRequestException('Selected variant is invalid');
+      }
+
+      if (product.variants.length > 0 && !variant) {
+        throw new BadRequestException('Please select a product variant');
+      }
+
+      const stock = variant ? variant.stock : product.stock;
+      const price = variant ? variant.price : product.price;
+      const productImage =
+        variant?.image ??
+        product.images?.[0]?.url ??
+        product.imageUrl ??
+        null;
+
+      const existingItem = await tx.orderItem.findFirst({
         where: {
-          orderId_productId: {
-            orderId: cart.id,
-            productId,
-          },
+          orderId: cart.id,
+          productId,
+          variantId: variant?.id ?? null,
         },
       });
 
@@ -181,9 +222,9 @@ export class CartService {
         : quantity;
 
       // 🔥 STOCK GUARD (backend-level safety)
-      if (newQty > product.stock) {
+      if (newQty > stock) {
         throw new BadRequestException(
-          `Only ${product.stock} items available`,
+          `Only ${stock} items available`,
         );
       }
 
@@ -200,11 +241,17 @@ export class CartService {
           data: {
             orderId: cart.id,
             productId,
+            variantId: variant?.id,
             productName: product.name,
-            productImage: product.images?.[0]?.url ?? product.imageUrl ?? null,
-            priceSnapshot: product.price,
+            variantName: this.getVariantLabel(variant?.attributes),
+            variantSku: variant?.sku,
+            ...(variant?.attributes && {
+              variantAttributes: variant.attributes as any,
+            }),
+            productImage,
+            priceSnapshot: price,
             quantity,
-            subtotal: quantity * Number(product.price),
+            subtotal: quantity * Number(price),
           },
         });
       }
@@ -258,7 +305,13 @@ export class CartService {
         where: { id: item.productId },
       });
 
-      const stock = product?.stock ?? 0;
+      const variant = item.variantId
+        ? await tx.productVariant.findUnique({
+            where: { id: item.variantId },
+          })
+        : null;
+
+      const stock = variant?.stock ?? product?.stock ?? 0;
 
       if (quantity > stock) {
         throw new BadRequestException(`Only ${stock} items available`);
@@ -318,11 +371,19 @@ export class CartService {
           where: { id: item.productId },
         });
 
-        const stock = product?.stock ?? 0;
+        const variant = item.variantId
+          ? await this.prisma.productVariant.findUnique({
+              where: { id: item.variantId },
+            })
+          : null;
+
+        const stock = variant?.stock ?? product?.stock ?? 0;
 
         if (stock === 0) {
           return {
+            orderItemId: item.id,
             productId: item.productId,
+            variantId: item.variantId,
             name: item.productName,
             requestedQty: item.quantity,
             availableStock: 0,
@@ -333,7 +394,9 @@ export class CartService {
 
         if (item.quantity > stock) {
           return {
+            orderItemId: item.id,
             productId: item.productId,
+            variantId: item.variantId,
             name: item.productName,
             requestedQty: item.quantity,
             availableStock: stock,
@@ -344,7 +407,9 @@ export class CartService {
         }
 
         return {
+          orderItemId: item.id,
           productId: item.productId,
+          variantId: item.variantId,
           name: item.productName,
           requestedQty: item.quantity,
           availableStock: stock,
@@ -363,7 +428,7 @@ export class CartService {
   // REMOVE ITEM
   // ================================
 
-  async removeItem(userId: string, productId: string) {
+  async removeItem(userId: string, orderItemId: string) {
     const order = await this.prisma.$transaction(async (tx) => {
       const cart = await tx.order.findFirst({
         where: { userId, status: OrderStatus.DRAFT },
@@ -372,7 +437,7 @@ export class CartService {
 
       if (!cart) throw new NotFoundException('Cart not found');
 
-      const item = cart.items.find((i) => i.productId === productId);
+      const item = cart.items.find((i) => i.id === orderItemId);
       if (!item) throw new NotFoundException('Item not found');
 
       await tx.orderItem.delete({ where: { id: item.id } });
