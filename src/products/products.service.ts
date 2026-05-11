@@ -305,7 +305,7 @@ export class ProductsService {
 
         const slug = this.generateSlug(name);
 
-        const baseSku = `${slug}-default`;
+        const baseSku = sku || `${slug}-default`;
 
         return this.prisma.product.create({
             data: {
@@ -473,13 +473,14 @@ export class ProductsService {
                 // UPDATE existing
                 for (const v of variantsToUpdate) {
                     await tx.productVariant.update({
-                    where: { id: v.id },
-                    data: {
-                        price: Number(v.price),
-                        stock: Number(v.stock),
-                        attributes: v.attributes,
-                        image: v.image || null,
-                    },
+                        where: { id: v.id },
+                        data: {
+                            sku: v.sku,
+                            price: Number(v.price),
+                            stock: Number(v.stock),
+                            attributes: v.attributes,
+                            image: v.image || null,
+                        },
                     });
                 }
 
