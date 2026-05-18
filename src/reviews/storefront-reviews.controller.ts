@@ -23,7 +23,6 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import type { AuthUser } from 'src/auth/interfaces/auth-user.interface';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
-import { reviewImageStorage } from 'src/config/multer.config';
 
 @ApiTags('Reviews')
 @ApiBearerAuth()
@@ -76,11 +75,7 @@ export class StorefrontReviewsController {
 
   @Post(':id/images')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(
-    FilesInterceptor('images', 5, {
-      storage: reviewImageStorage,
-    }),
-  )
+  @UseInterceptors(FilesInterceptor('images', 5))
   uploadReviewImages(
     @Param('id') reviewId: string,
     @UploadedFiles() files: Express.Multer.File[],

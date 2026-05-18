@@ -44,7 +44,7 @@ export class StorefrontProductsController {
         @Param('slug') slug: string
         ) {
             return this.productsService.hasPurchasedProduct(
-                req.user.userId,
+                req.user.id,
                 slug
         );
     }

@@ -7,10 +7,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReviewStatus } from '@prisma/client';
+import { CloudinaryService } from 'src/common/cloudinary/cloudinary.service';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cloudinaryService: CloudinaryService,
+  ) {}
 
   // ================= USER =================
 
@@ -39,7 +43,7 @@ export class ReviewsService {
                 productId: product.id,
                 order: {
                     userId,
-                    status: 'DELIVERED',
+                    status: { in: ['DELIVERED', 'COMPLETED'] },
                 },
                 review: null,
             },
@@ -280,6 +284,9 @@ export class ReviewsService {
         files: Express.Multer.File[],
         userId: string,
     ) {
+        if (!files?.length) {
+            throw new BadRequestException('No images uploaded');
+        }
 
         const review = await this.prisma.review.findUnique({
             where: { id: reviewId },
@@ -293,8 +300,16 @@ export class ReviewsService {
             throw new ForbiddenException('Not your review');
         }
 
-        const images = files.map(file => ({
-            url: `/uploads/reviews/${file.filename}`,
+        const uploadedImages = await Promise.all(
+            files.map(file =>
+                this.cloudinaryService.uploadImage(file, {
+                    folder: 'reviews',
+                }),
+            ),
+        );
+
+        const images = uploadedImages.map(image => ({
+            url: image.url,
             reviewId,
         }));
 
@@ -302,7 +317,7 @@ export class ReviewsService {
             data: images,
         });
 
-        return { uploaded: images.length };
+        return { uploaded: images.length, images };
     }
 
     // ADMIN Service

@@ -658,7 +658,7 @@ export class ProductsService {
                 productId: product.id,
                 order: {
                     userId,
-                    status: 'DELIVERED'
+                    status: { in: ['DELIVERED', 'COMPLETED'] },
                 }
             }
         });
