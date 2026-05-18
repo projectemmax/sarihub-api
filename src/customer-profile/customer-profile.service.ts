@@ -3,11 +3,15 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { UpdateCustomerProfileDto } from './dto/update-customer-profile.dto';
+import { CloudinaryService } from 'src/common/cloudinary/cloudinary.service';
 
 
 @Injectable()
 export class CustomerProfileService {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private cloudinaryService: CloudinaryService,
+    ) {}
 
     async getMyProfile(userId: string) {
         const profile = await this.prisma.customerProfile.findUnique({
@@ -33,11 +37,19 @@ export class CustomerProfileService {
         };
     }
 
-    async updateAvatar(userId: string, filename: string) {
+    async updateAvatar(userId: string, file: Express.Multer.File) {
+        if (!file) {
+            throw new BadRequestException('Avatar file is required');
+        }
+
+        const uploaded = await this.cloudinaryService.uploadImage(file, {
+            folder: 'avatars/customers',
+        });
+
         return this.prisma.customerProfile.update({
             where: { userId },
             data: {
-                avatar: `avatars/admin/${filename}`,
+                avatar: uploaded.url,
             },
         });
     }
@@ -112,9 +124,7 @@ export class CustomerProfileService {
             firstName: user?.customer?.firstName ?? user?.email?.split('@')[0],
             lastName: user?.customer?.lastName ?? '',
             mobileNo: user?.customer?.mobileNo ?? '',
-            avatarUrl: user?.customer?.avatar
-            ? `${process.env.API_BASE_URL}/uploads/${user.customer.avatar}`
-            : null
+            avatarUrl: user?.customer?.avatar ?? null
         };
     }
 

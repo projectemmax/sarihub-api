@@ -23,7 +23,6 @@ import {
 } from '@nestjs/swagger';
 import { UpdateCustomerProfileDto } from './dto/update-customer-profile.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { adminAvatarStorage } from 'src/common/storage/admin-avatar.storage';
 
 @ApiTags('Customer Profile')
 @ApiBearerAuth()
@@ -49,7 +48,6 @@ export class CustomerProfileController {
     @Post('me/avatar')
     @UseInterceptors(
         FileInterceptor('avatar', {
-            storage: adminAvatarStorage,
             limits: {
                 fileSize: 1024 * 1024, // 1MB
             },
@@ -71,7 +69,7 @@ export class CustomerProfileController {
     ) {
         return this.customerProfileService.updateAvatar(
             req.user.id,
-            file.filename,
+            file,
         );
     }
 
