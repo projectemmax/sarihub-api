@@ -97,21 +97,26 @@ export class AdminProductsController {
     // }
 
     @Post('upload')
-    @UseInterceptors(FileInterceptor('file', {
-        storage: diskStorage({
-            destination: './uploads/products',
-            filename: (req, file, cb) => {
-            const uniqueName = Date.now() + '-' + Math.random();
-            cb(null, uniqueName + extname(file.originalname));
-            }
-        })
-    }))
-    
-    uploadTemp(@UploadedFile() file: Express.Multer.File) {
+    @UseInterceptors(FileInterceptor('file'))
+    async uploadTemp(
+        @UploadedFile() file: Express.Multer.File
+    ) {
+
+        const result = await this.cloudinaryService.uploadImage(file, {
+            folder: 'products',
+        });
+
         return {
-            url: `/uploads/products/${file.filename}`
+            url: result.url,
+            publicId: result.publicId
         };
     }
+    
+    // uploadTemp(@UploadedFile() file: Express.Multer.File) {
+    //     return {
+    //         url: `/uploads/products/${file.filename}`
+    //     };
+    // }
 
 
     // PATCH /api/admin/products/:id/restore

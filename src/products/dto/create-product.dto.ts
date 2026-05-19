@@ -99,6 +99,11 @@ export class CreateProductDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sku?: string;
+
   @ApiPropertyOptional({
     enum: ['DRAFT', 'PUBLISHED', 'ARCHIVED'],
   })
