@@ -302,6 +302,72 @@ export class OrdersService {
         };
     }
 
+    async getSellerOrders(
+        userId: string,
+        page = 1,
+        limit = 10,
+    ) {
+
+        const seller = await this.prisma.user.findUnique({
+            where: {id: userId,},
+            select: {
+                storeId: true,
+            },
+        });
+
+        if (!seller?.storeId) {
+            throw new ForbiddenException(
+                'Seller has no assigned store',
+            );
+        }
+
+        const skip = (page - 1) * limit;
+
+        const where = {
+            status: {
+                not: OrderStatus.DRAFT,
+            },
+            items: {
+                some: {
+                    storeId: seller.storeId,
+                },
+            },
+        };
+
+        const [orders, total] = await Promise.all([
+            this.prisma.order.findMany({
+                where,
+                include: {
+                    user: true,
+                    items: {
+                        where: {
+                        storeId:
+                            seller.storeId,
+                        },
+                    },
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+                skip,
+                take: limit,
+            }),
+
+            this.prisma.order.count({
+                where,
+            }),
+        ]);
+
+        return {
+            data: orders,
+            meta: {
+                page,
+                limit,
+                total,
+            },
+        };
+    }
+
     async reorder(userId: string, orderId: string) {
 
         const previousOrder = await this.prisma.order.findFirst({
