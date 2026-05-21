@@ -209,6 +209,10 @@ model Order {
   completedAt        DateTime?
   orderNumber        String               @unique
   user               User?                @relation(fields: [userId], references: [id])
+
+  storeId            String?
+  store              Store?               @relation(fields: [storeId], references: [id])
+
   items              OrderItem[]
   statusHistory      OrderStatusHistory[]
   paymentTransaction PaymentTransaction[]
@@ -401,4 +405,5 @@ model Store {
 
   users     User[]
   products  Product[]
+  orders    Order[]
 }
