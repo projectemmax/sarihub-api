@@ -87,6 +87,10 @@ model User {
   changedOrderStatuses OrderStatusHistory[] @relation("OrderStatusChangedBy")
   Review               Review[]
   reviewVotes          ReviewVote[]
+  storeId              String?
+
+  store                Store?               @relation(fields:[storeId], references:[id])
+
 }
 
 model CustomerProfile {
@@ -384,14 +388,11 @@ model Media {
 
 model Store {
   id        String   @id @default(uuid())
-
   name      String
-
   slug      String   @unique
-
   isActive  Boolean  @default(true)
-
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
+
+  users     User[]
 }
