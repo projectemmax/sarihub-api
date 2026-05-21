@@ -33,6 +33,11 @@ model Product {
   reviews        Review[]
 
   @@index([categoryId])
+
+  storeId        String?
+
+  store          Store?           @relation(fields:[storeId], references:[id])
+
 }
 
 model ProductVariant {
@@ -395,4 +400,5 @@ model Store {
   updatedAt DateTime @updatedAt
 
   users     User[]
+  products  Product[]
 }
