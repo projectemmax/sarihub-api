@@ -13,67 +13,88 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 
-import { SellerDashboardService } from './seller-dashboard.service';
+import { SellerDashboardService }
+from './seller-dashboard.service';
 
 @Controller('seller/dashboard')
+
 @UseGuards(
   JwtAuthGuard,
   RolesGuard,
 )
-@Roles(UserRole.SELLER)
+
+@Roles(
+  UserRole.SELLER
+)
+
 export class SellerDashboardController {
 
-    constructor(
-        private dashboard:
-        SellerDashboardService
-    ) {}
+  constructor(
+    private dashboard:
+    SellerDashboardService
+  ) {}
 
-    @Get('stats')
-    stats(
-        @Req() req
-    ) {
-        return this.dashboard.stats(
-        req.user.id
-        );
-    }
+  @Get('stats')
+  stats(
+    @Req() req
+  ) {
 
-    @Get('analytics')
-    analytics(
-        @Req() req,
-        @Query('range')
-        range: string,
-    ) {
-        return this.dashboard.analytics(
-        req.user.id,
-        range,
-        );
-    }
+    console.log(
+        'SELLER REQ USER =>',
+        req.user
+    );
 
-    @Get('top-products')
-    topProducts(
-        @Req() req
-    ) {
-        return this.dashboard.topProducts(
-        req.user.id
-        );
-    }
+    return this.dashboard
+      .stats(
+        req.user.storeId
+      );
+  }
 
-    @Get('latest-customers')
-    customers(
-        @Req() req
-    ) {
-        return this.dashboard.latestCustomers(
-        req.user.id
-        );
-    }
+  @Get('analytics')
+  analytics(
+    @Req() req,
 
-    @Get('pending-reviews')
-    reviews(
-        @Req() req
-    ) {
-        return this.dashboard.pendingReviews(
-        req.user.id
-        );
-    }
+    @Query('range')
+    range: string
+  ) {
 
+    return this.dashboard
+      .analytics(
+        req.user.storeId,
+        range
+      );
+  }
+
+  @Get('top-products')
+  topProducts(
+    @Req() req
+  ) {
+
+    return this.dashboard
+      .topProducts(
+        req.user.storeId
+      );
+  }
+
+  @Get('latest-customers')
+  customers(
+    @Req() req
+  ) {
+
+    return this.dashboard
+      .latestCustomers(
+        req.user.storeId
+      );
+  }
+
+  @Get('pending-reviews')
+  reviews(
+    @Req() req
+  ) {
+
+    return this.dashboard
+      .pendingReviews(
+        req.user.storeId
+      );
+  }
 }

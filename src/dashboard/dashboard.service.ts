@@ -15,24 +15,65 @@ export class DashboardService {
         private aggregate: DashboardAggregationService
     ) {}
 
-    async getStats() {
-        const totalOrders = await this.prisma.order.count();
-        const totalCustomers = await this.prisma.user.count({
-            where: { role: 'CUSTOMER' }
-        });
+    async getStats(
+        storeId?: string
+    ) {
 
-        const pendingReviews = await this.prisma.review.count({
-            where: { status: 'PENDING' }
-        });
+        console.log(
+            'STORE ID RECEIVED =>',
+            storeId
+        );
 
-        const sales = await this.prisma.order.aggregate({
-            _sum: { totalAmount: true }
-        });
+        if (storeId) {
+
+            return this.aggregate
+                .getMetrics(
+                    storeId
+                );
+        }
+
+        const totalOrders =
+            await this.prisma.order.count();
+
+        const totalCustomers =
+            await this.prisma.user.count({
+
+                where: {
+                    role:
+                    'CUSTOMER'
+                }
+            });
+
+        const pendingReviews =
+            await this.prisma.review.count({
+
+                where: {
+                    status:
+                    'PENDING'
+                }
+            });
+
+        const sales =
+            await this.prisma.order.aggregate({
+
+                _sum: {
+                    totalAmount:
+                    true
+                }
+            });
 
         return {
-            orders: totalOrders,
-            customers: totalCustomers,
-            sales: sales._sum.totalAmount || 0,
+
+            orders:
+                totalOrders,
+
+            customers:
+                totalCustomers,
+
+            sales:
+                sales._sum
+                    .totalAmount || 0,
+
             pendingReviews
         };
     }

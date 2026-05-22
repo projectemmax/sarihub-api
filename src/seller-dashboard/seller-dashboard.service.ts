@@ -1,125 +1,194 @@
 /* eslint-disable prettier/prettier */
+
 import {
   Injectable,
-  ForbiddenException,
 } from '@nestjs/common';
 
+import { DashboardAggregationService } from '../dashboard/services/dashboard-aggregation.service';
 import { PrismaService } from '../prisma/prisma.service';
-
 @Injectable()
 export class SellerDashboardService {
 
     constructor(
-        private prisma: PrismaService,
+        private aggregate:
+        DashboardAggregationService,
+        private prisma: PrismaService
     ) {}
 
-    private async getStoreId(
-        userId: string,
-    ) {
-
-        const user =
-        await this.prisma.user.findUnique({
-            where: {
-            id: userId,
-            },
-
-            select: {
-            storeId: true,
-            },
-        });
-
-        if (!user?.storeId) {
-        throw new ForbiddenException(
-            'Seller store missing',
-        );
-        }
-
-        return user.storeId;
-    }
-
     async stats(
-        userId: string,
+        storeId: string
     ) {
 
-        const storeId =
-        await this.getStoreId(
-            userId,
-        );
+        const metrics =
+        await this.aggregate
+            .getMetrics(
+            storeId
+            );
 
         return {
-        data: {
-            orders:
-            await this.prisma.order.count({
-                where: {
-                storeId,
-                },
-            }),
-
-            sales: 0,
-
-            customers: 0,
-
-            pendingReviews: 0,
-        },
+        data:
+            metrics
         };
     }
 
     async analytics(
-        userId: string,
-        range: string,
+        storeId: string,
+
+        range: string
     ) {
 
-        await this.getStoreId(
-        userId,
-        );
+        const timeline =
+        await this.aggregate
+            .getAnalytics(
+            range as
+            '1D'
+            | '7D'
+            | '1M'
+            | '1Y',
+
+            storeId
+            );
 
         return {
+
         data: {
-            timeline: [],
-            totalRevenue: 0,
-            totalOrders: 0,
-            growth: 0,
-        },
+
+            timeline,
+
+            totalRevenue:
+            timeline.reduce(
+                (
+                a,
+                b
+                ) =>
+                a +
+                Number(
+                    b.subtotal ??
+                    0
+                ),
+
+                0
+            ),
+
+            totalOrders:
+            timeline.length,
+
+            growth:
+            0
+        }
         };
     }
 
-    async topProducts(
-        userId: string,
-    ) {
+    async topProducts(storeId: string) {
 
-        await this.getStoreId(
-        userId,
-        );
+        const rows =
+            await this.aggregate.getTopProducts(
+            storeId
+            );
+
+        const products =
+            await Promise.all(
+            rows.map(async (r) => {
+
+                const product =
+                await this.prisma.product.findUnique({
+                    where: {
+                    id: r.productId,
+                    },
+                    select: {
+                    name: true,
+                    },
+                });
+
+                return {
+                name: product?.name ?? 'Unknown',
+                sold: Number(r._sum?.quantity ?? 0),
+                };
+            })
+            );
 
         return {
-        data: [],
+            data: products,
         };
     }
 
     async latestCustomers(
-        userId: string,
+        storeId: string
     ) {
 
-        await this.getStoreId(
-        userId,
-        );
+        const metrics =
+        await this.aggregate
+            .getMetrics(
+            storeId
+            );
 
         return {
-        data: [],
+        data:
+        metrics
         };
     }
 
     async pendingReviews(
-        userId: string,
+        storeId: string
     ) {
 
-        await this.getStoreId(
-        userId,
-        );
+        const rows =
+        await this.prisma.review.findMany({
+            take: 10,
+            orderBy: {
+                createdAt:
+                'desc'
+            },
+            where: {
+                product: {
+                    storeId
+                }
+            },
+            include: {
+                product: {
+                    select: {
+                        name: true,
+                        imageUrl: true,
+                        images: true
+                    }
+                },
+                user: {
+                    select: {
+                        customer: {
+                            select: {
+                                firstName: true,
+                                lastName: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
         return {
-        data: [],
+            data: rows.map((r) => ({
+                ...r,
+
+                // Match Admin response shape
+                images: r.product?.imageUrl
+                ? [
+                    {
+                        url: r.product.imageUrl,
+                    },
+                    ]
+                : (
+                    r.product?.images?.map((img) => ({
+                        url: img.url,
+                    })) ?? []
+                    ),
+
+                user: {
+                customer: {
+                    firstName: r.user?.customer?.firstName,
+                    lastName: r.user?.customer?.lastName,
+                },
+                },
+            })),
         };
     }
-
 }
