@@ -1,5 +1,7 @@
+/* eslint-disable prettier/prettier */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { DashboardRange, resolveRange } from '../utils/analytics-period.util';
 
 @Injectable()
 export class DashboardAggregationService {
@@ -258,4 +260,55 @@ export class DashboardAggregationService {
             take: 5
         });
     }
+
+    private buildGroupFormat(
+        range: DashboardRange,
+    ) {
+        switch (range) {
+
+            case '1D':
+            return 'hour';
+
+            case '7D':
+            return 'day';
+
+            case '1M':
+            return 'day';
+
+            case '1Y':
+            return 'month';
+
+        }
+    }
+
+    async getRevenueTimeline(
+        storeId?: string,
+        range: DashboardRange='7D',
+    ) {
+        const period = resolveRange(range);
+        const orders = await this.prisma.order.findMany({
+            where: {
+                storeId,
+                createdAt: {
+                    gte: period.currentStart,
+                    lte: period.currentEnd,
+                },
+                status: 'COMPLETED',
+            },
+            select: {
+                createdAt: true,
+                totalAmount: true,
+            },
+            orderBy:{
+                createdAt:'asc'
+            },
+        });
+
+        return {
+            orders,
+            period
+        };
+    }
+
+
 }
