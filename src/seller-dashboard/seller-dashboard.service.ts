@@ -1,176 +1,125 @@
 /* eslint-disable prettier/prettier */
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+} from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
-import { OrderStatus } from '@prisma/client';
-import { format, subDays } from 'date-fns';
 
 @Injectable()
 export class SellerDashboardService {
+
     constructor(
-        private readonly prisma: PrismaService
+        private prisma: PrismaService,
     ) {}
 
-    async getStats(storeId: string) {
-        const validStatuses = [
-            OrderStatus.PROCESSING,
-            OrderStatus.SHIPPED,
-            OrderStatus.DELIVERED,
-        ];
+    private async getStoreId(
+        userId: string,
+    ) {
 
-        const orders =
-            await this.prisma.orderItem.count({
-                where: {
-                    storeId,
-                    order: {
-                        status: {
-                            in: validStatuses,
-                        },
-                    },
-                },
-            });
+        const user =
+        await this.prisma.user.findUnique({
+            where: {
+            id: userId,
+            },
 
-        const sales =
-            await this.prisma.orderItem.aggregate({
-                _sum: {
-                    subtotal: true,
-                },
-                where: {
-                    storeId,
-                    order: {
-                        status: {
-                            in: validStatuses,
-                        },
-                    },
-                },
-            });
+            select: {
+            storeId: true,
+            },
+        });
 
-        const products =
-            await this.prisma.product.count({
-                where: {
-                    storeId,
-                },
-            });
+        if (!user?.storeId) {
+        throw new ForbiddenException(
+            'Seller store missing',
+        );
+        }
+
+        return user.storeId;
+    }
+
+    async stats(
+        userId: string,
+    ) {
+
+        const storeId =
+        await this.getStoreId(
+            userId,
+        );
 
         return {
-            orders,
-            sales:
-                Number(
-                    sales._sum?.subtotal ?? 0
-                ),
-            products,
+        data: {
+            orders:
+            await this.prisma.order.count({
+                where: {
+                storeId,
+                },
+            }),
+
+            sales: 0,
+
+            customers: 0,
+
+            pendingReviews: 0,
+        },
         };
     }
 
-    async getAnalytics(
-        storeId: string,
+    async analytics(
+        userId: string,
         range: string,
     ) {
-        const startDate =
-            range === '1D'
-                ? subDays(new Date(), 1)
-                : subDays(new Date(), 7);
 
-        const rows =
-            await this.prisma.orderItem.findMany({
-                where: {
-                    storeId,
-                    order: {
-                        placedAt: {
-                            gte: startDate,
-                        },
-                        status: {
-                            in: [
-                                OrderStatus.PROCESSING,
-                                OrderStatus.SHIPPED,
-                                OrderStatus.DELIVERED,
-                            ],
-                        },
-                    },
-                },
-
-                select: {
-                    subtotal: true,
-
-                    order: {
-                        select: {
-                            placedAt: true,
-                        },
-                    },
-                },
-            });
-
-        const map =
-            new Map<
-                string,
-                {
-                    revenue: number;
-                    orders: number;
-                }
-            >();
-
-        rows.forEach((row) => {
-            if (!row.order?.placedAt) {
-                return;
-            }
-
-            const key =
-                format(
-                    row.order.placedAt,
-                    'yyyy-MM-dd',
-                );
-
-            if (!map.has(key)) {
-                map.set(key, {
-                    revenue: 0,
-                    orders: 0,
-                });
-            }
-
-            const current =
-                map.get(key)!;
-
-            current.revenue +=
-                Number(
-                    row.subtotal ?? 0
-                );
-
-            current.orders += 1;
-        });
-
-        return Array.from(
-            map.entries(),
-        ).map(
-            ([date, value]) => ({
-                date,
-                ...value,
-            }),
+        await this.getStoreId(
+        userId,
         );
+
+        return {
+        data: {
+            timeline: [],
+            totalRevenue: 0,
+            totalOrders: 0,
+            growth: 0,
+        },
+        };
     }
 
-    async getTopProducts(
-        storeId: string,
+    async topProducts(
+        userId: string,
     ) {
-        return this.prisma.orderItem.groupBy({
-            by: [
-                'productId',
-            ],
 
-            where: {
-                storeId,
-            },
+        await this.getStoreId(
+        userId,
+        );
 
-            _sum: {
-                quantity: true,
-            },
-
-            orderBy: {
-                _sum: {
-                    quantity:
-                        'desc',
-                },
-            },
-
-            take: 5,
-        });
+        return {
+        data: [],
+        };
     }
+
+    async latestCustomers(
+        userId: string,
+    ) {
+
+        await this.getStoreId(
+        userId,
+        );
+
+        return {
+        data: [],
+        };
+    }
+
+    async pendingReviews(
+        userId: string,
+    ) {
+
+        await this.getStoreId(
+        userId,
+        );
+
+        return {
+        data: [],
+        };
+    }
+
 }
