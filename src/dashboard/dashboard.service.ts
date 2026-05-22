@@ -4,12 +4,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus } from '@prisma/client';
 import { format, subDays, subMonths, subYears } from 'date-fns';
+import { DashboardAggregationService } from './services/dashboard-aggregation.service';
 
 
 @Injectable()
 export class DashboardService {
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private aggregate: DashboardAggregationService
+    ) {}
 
     async getStats() {
         const totalOrders = await this.prisma.order.count();
@@ -302,6 +306,41 @@ export class DashboardService {
             revenue: map.get(date)?.revenue || 0,
             orders: map.get(date)?.orders || 0
         }));
+    }
+
+    async getSellerDashboard(
+        storeId: string
+        ) {
+
+        const [
+            metrics,
+            analytics,
+            topProducts
+        ] = await Promise.all([
+
+            this.aggregate.getMetrics(
+            storeId
+            ),
+
+            this.aggregate.getAnalytics(
+            '7D',
+            storeId
+            ),
+
+            this.aggregate.getTopProducts(
+            storeId
+            )
+        ]);
+
+        return {
+            metrics,
+            analytics,
+            topProducts
+        };
+    }
+
+    async getAdminDashboard() {
+        return this.aggregate.getMetrics();
     }
 
 }
