@@ -300,49 +300,142 @@ return {
 };
 }
 
-    async getTopProducts() {
+    async getTopProducts(storeId?: string) {
         const products = await this.prisma.orderItem.groupBy({
             by: ['productId'],
-            _sum: { quantity: true },
+            _sum: {
+                quantity: true,
+            },
             orderBy: {
-                _sum: { quantity: 'desc' }
+                _sum: {
+                    quantity: 'desc',
+                },
             },
             take: 5,
             where: {
+                ...(storeId && {
+                    product: {
+                        storeId,
+                    },
+                }),
                 order: {
                     status: {
                         in: [
-                        OrderStatus.PROCESSING,
-                        OrderStatus.SHIPPED,
-                        OrderStatus.DELIVERED
-                        ]
+                            OrderStatus.PROCESSING,
+                            OrderStatus.SHIPPED,
+                            OrderStatus.DELIVERED,
+                        ],
                     },
                     placedAt: {
-                        not: null
-                    }
-                }
-            }
-        });
-
-        const productIds = products.map(p => p.productId);
-
-        const productDetails = await this.prisma.product.findMany({
-            where: {
-                id: { in: productIds },
+                        not: null,
+                    },
+                },
             },
-            select: {
-                id: true,
-                name: true
-            }
         });
 
-        const productMap = new Map(productDetails.map(p => [p.id, p]));
+        if (!products.length) {
+            return [];
+        }
 
-        return products.map(p => ({
-        productId: p.productId,
-        name: productMap.get(p.productId)?.name,
-        sold: p._sum.quantity
-        }));
+        const productIds = products.map(
+            p => p.productId,
+        );
+
+        const productDetails =
+            await this.prisma.product.findMany({
+                where: {
+                    id: {
+                        in: productIds,
+                    },
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    images: {
+                        select: {
+                            url: true,
+                        },
+                        take: 1,
+                    },
+                },
+            });
+
+        const productMap = new Map(
+            productDetails.map(
+                p => [p.id, p],
+            ),
+        );
+
+        const totalRevenue =
+            products.reduce(
+                (sum, p) => {
+
+                    const product =
+                        productMap.get(
+                            p.productId,
+                        );
+
+                    return (
+                        sum +
+                        (
+                            (
+                                p._sum.quantity ??
+                                0
+                            ) *
+                            Number(
+                                product?.price ??
+                                0,
+                            )
+                        )
+                    );
+                },
+                0,
+            );
+
+        return products.map(
+            p => {
+
+                const product =
+                    productMap.get(
+                        p.productId,
+                    );
+
+                const sold =
+                    p._sum.quantity ??
+                    0;
+
+                const revenue =
+                    sold *
+                    Number(
+                        product?.price ??
+                        0,
+                    );
+
+                return {
+                    id: p.productId,
+                    name:
+                        product?.name ??
+                        'Unknown',
+                    sold,
+                    revenue,
+                    image:
+                        product?.images?.[0]?.url ??
+                        undefined,
+                    percentage:
+                        totalRevenue > 0
+                            ? Number(
+                                (
+                                    (
+                                        revenue /
+                                        totalRevenue
+                                    ) * 100
+                                ).toFixed(1),
+                            )
+                            : 0,
+                };
+            },
+        );
     }
 
     async getLatestCustomers() {

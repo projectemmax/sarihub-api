@@ -6,11 +6,12 @@ export interface DashboardStatsDto {
 }
 
 export interface DashboardTopProductDto {
-  id: string;
-  name: string;
-  sold?: number;
-  revenue?: number;
-  image?: string;
+    id: string;
+    name: string;
+    sold?: number;
+    revenue?: number;
+    image?: string;
+    percentage?: number;
 }
 
 export interface DashboardReviewDto {

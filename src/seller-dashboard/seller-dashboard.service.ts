@@ -3,16 +3,16 @@
 import {
   Injectable,
 } from '@nestjs/common';
-
 import { DashboardAggregationService } from '../dashboard/services/dashboard-aggregation.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { DashboardService } from 'src/dashboard/dashboard.service';
 @Injectable()
 export class SellerDashboardService {
 
     constructor(
-        private aggregate:
-        DashboardAggregationService,
-        private prisma: PrismaService
+        private aggregate: DashboardAggregationService,
+        private prisma: PrismaService,
+        private dashboardService: DashboardService
     ) {}
 
     async stats(
@@ -115,32 +115,11 @@ export class SellerDashboardService {
 }
 
     async topProducts(storeId: string) {
-
-        const rows =
-            await this.aggregate.getTopProducts(
-            storeId
-            );
-
         const products =
-            await Promise.all(
-            rows.map(async (r) => {
-
-                const product =
-                await this.prisma.product.findUnique({
-                    where: {
-                    id: r.productId,
-                    },
-                    select: {
-                    name: true,
-                    },
-                });
-
-                return {
-                name: product?.name ?? 'Unknown',
-                sold: Number(r._sum?.quantity ?? 0),
-                };
-            })
-            );
+            await this.dashboardService
+                .getTopProducts(
+                    storeId,
+                );
 
         return {
             data: products,
