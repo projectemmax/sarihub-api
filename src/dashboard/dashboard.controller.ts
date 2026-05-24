@@ -18,19 +18,13 @@ from 'src/auth/decorators/current-user.decorator';
 export class DashboardController {
 
     constructor(
-        private dashboardService:
-        DashboardService
+        private dashboardService: DashboardService
     ) {}
 
     @Get('stats')
     getStats(
         @Req() req
     ) {
-
-    console.log(
-        'REQ USER =>',
-        req.user
-    );
 
     return this.dashboardService
         .getStats(
@@ -43,13 +37,13 @@ export class DashboardController {
     @Get('analytics')
     getAnalytics(
         @Query('range')
-        range: string = '7D'
+        range: string = '7D',
     ) {
 
         return this.dashboardService
-        .getAnalytics(
-            range
-        );
+            .getAnalytics(
+                range,
+            );
     }
 
     @Get('top-products')

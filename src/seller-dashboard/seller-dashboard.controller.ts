@@ -39,11 +39,6 @@ export class SellerDashboardController {
     @Req() req
   ) {
 
-    console.log(
-        'SELLER REQ USER =>',
-        req.user
-    );
-
     return this.dashboard
       .stats(
         req.user.storeId

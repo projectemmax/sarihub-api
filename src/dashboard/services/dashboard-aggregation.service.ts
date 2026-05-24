@@ -110,98 +110,116 @@ export class DashboardAggregationService {
     }
 
     async getAnalytics(
-        period:
-            '1D'
-            | '7D'
-            | '1M'
-            | '1Y',
+    period:
+        '1D'
+        | '7D'
+        | '1M'
+        | '1Y',
 
-        storeId?: string
+    storeId?: string,
+) {
+
+    const start =
+        new Date();
+
+    switch (
+        period
     ) {
 
-        const start =
-            new Date();
+        case '1D':
 
-        switch (
-            period
-        ) {
+            start.setDate(
+                start.getDate() - 1,
+            );
 
-            case '1D':
-                start.setDate(
-                    start.getDate() - 1
-                );
-                break;
+            break;
 
-            case '7D':
-                start.setDate(
-                    start.getDate() - 7
-                );
-                break;
+        case '7D':
 
-            case '1M':
-                start.setMonth(
-                    start.getMonth() - 1
-                );
-                break;
+            start.setDate(
+                start.getDate() - 7,
+            );
 
-            case '1Y':
-                start.setFullYear(
-                    start.getFullYear() - 1
-                );
-        }
+            break;
 
-        const productIds =
-            storeId
-                ? (
-                    await this.prisma.product.findMany({
+        case '1M':
 
-                        where: {
-                            storeId
-                        },
+            start.setMonth(
+                start.getMonth() - 1,
+            );
 
-                        select: {
-                            id: true
-                        }
-                    })
-                ).map(
-                    p => p.id
-                )
-                : [];
+            break;
 
-        return this.prisma.orderItem.findMany({
+        case '1Y':
 
-            where: {
-
-                ...(storeId && {
-
-                    productId: {
-                        in:
-                            productIds
-                    }
-                }),
-
-                createdAt: {
-                    gte:
-                        start
-                }
-            },
-
-            select: {
-
-                createdAt:
-                    true,
-
-                subtotal:
-                    true
-            },
-
-            orderBy: {
-
-                createdAt:
-                    'asc'
-            }
-        });
+            start.setFullYear(
+                start.getFullYear() - 1,
+            );
     }
+
+    const productIds =
+        storeId
+
+            ? (
+                await this.prisma.product.findMany({
+
+                    where: {
+                        storeId,
+                    },
+
+                    select: {
+                        id:
+                            true,
+                    },
+                })
+            ).map(
+                (
+                    p,
+                ) =>
+                    p.id,
+            )
+
+            : [];
+
+    return this.prisma.orderItem.findMany({
+
+        where: {
+
+            ...(storeId && {
+
+                productId: {
+
+                    in:
+                    productIds,
+                },
+            }),
+
+            createdAt: {
+
+                gte:
+                    start,
+            },
+        },
+
+        select: {
+
+            orderId:
+                true,
+
+            createdAt:
+                true,
+
+            subtotal:
+                true,
+        },
+
+        orderBy: {
+
+            createdAt:
+                'asc',
+        },
+    });
+}
 
     async getTopProducts(
         storeId?: string
@@ -283,32 +301,231 @@ export class DashboardAggregationService {
 
     async getRevenueTimeline(
         storeId?: string,
-        range: DashboardRange='7D',
+        range: DashboardRange = '7D',
     ) {
         const period = resolveRange(range);
-        const orders = await this.prisma.order.findMany({
-            where: {
-                storeId,
-                createdAt: {
-                    gte: period.currentStart,
-                    lte: period.currentEnd,
-                },
-                status: 'COMPLETED',
-            },
-            select: {
-                createdAt: true,
-                totalAmount: true,
-            },
-            orderBy:{
-                createdAt:'asc'
-            },
-        });
+        const productIds =
+            storeId
+                ? (
+                    await this.prisma.product.findMany({
+                        where: {
+                            storeId,
+                        },
 
-        return {
-            orders,
-            period
+                        select: {
+                            id: true,
+                        },
+                    })
+                ).map(
+                    p => p.id,
+                )
+                : [];
+
+        const baseWhere = {
+
+            ...(storeId && {
+                productId: {
+                    in: productIds,
+                },
+            }),
         };
+
+        const [
+            current,
+            previous,
+        ] = await Promise.all([
+
+            this.prisma.orderItem.findMany({
+                where: {
+                    ...baseWhere,
+                    createdAt: {
+                        gte: period.currentStart,
+                        lte: period.currentEnd,
+                    },
+                },
+
+                select: {
+                    orderId: true,
+                    createdAt: true,
+                    subtotal: true,
+                },
+
+                orderBy: {
+                    createdAt: 'asc',
+                },
+            }),
+
+            this.prisma.orderItem.findMany({
+                where: {
+                    ...baseWhere,
+                    createdAt: {
+                        gte: period.previousStart,
+                        lt: period.previousEnd,
+                    },
+                },
+
+                select: {
+                    createdAt: true,
+                    subtotal: true,
+                },
+            }),
+
+        ]);
+
+        const currentRevenue =
+            current.reduce(
+                (sum, item) =>
+                    sum +
+                    Number(
+                        item.subtotal ?? 0,
+                    ),
+                0,
+            );
+
+        const previousRevenue =
+            previous.reduce(
+                (sum, item) =>
+                    sum +
+                    Number(
+                        item.subtotal ?? 0,
+                    ),
+                0,
+            );
+
+        const revenueGrowth =
+    this.calculateGrowth(
+        currentRevenue,
+        previousRevenue,
+    );
+
+
+    const grouped =
+        new Map<
+            string,
+            {
+
+                revenue:
+                    number;
+
+                orders:
+                    number;
+
+                orderIds:
+                    Set<string>;
+            }
+        >();
+
+current.forEach(
+    (item) => {
+
+        const date =
+            item.createdAt
+                .toISOString()
+                .split('T')[0];
+
+        if (
+            !grouped.has(
+                date,
+            )
+        ) {
+
+            grouped.set(
+                date,
+
+                {
+                    revenue: 0,
+                    orders: 0,
+                    orderIds: new Set(),
+                },
+            );
+        }
+
+        const row =
+            grouped.get(
+                date,
+            )!;
+
+        row.revenue +=
+            Number(
+                item.subtotal ?? 0,
+            );
+
+        row.orderIds.add(
+            item.orderId,
+        );
+
+        row.orders =
+            row.orderIds.size;
+            },
+        );
+
+const timeline =
+    Array.from(
+        grouped.entries(),
+    ).map(
+        (
+            [
+                date,
+                values,
+            ],
+        ) => ({
+
+            date,
+
+            revenue:
+                values.revenue,
+
+            orders:
+                values.orders,
+        }),
+    );
+
+return {
+
+    timeline,
+
+    revenueGrowth: {
+
+        current:
+            currentRevenue,
+
+        previous:
+            previousRevenue,
+
+        growth:
+            revenueGrowth,
+    },
+
+    period,
+};
     }
+
+    private calculateGrowth(
+        current: number,
+        previous: number,
+    ) {
+
+        if (
+            previous === 0
+        ) {
+
+            return current > 0
+                ? 100
+                : 0;
+        }
+
+        return Number(
+            (
+                (
+                    (current - previous)
+                    /
+                    previous
+                ) * 100
+            ).toFixed(2),
+        );
+    }
+
+    
 
 
 }

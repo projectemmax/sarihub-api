@@ -32,52 +32,87 @@ export class SellerDashboardService {
     }
 
     async analytics(
-        storeId: string,
+    storeId: string,
 
-        range: string
-    ) {
+    range: string,
+) {
 
-        const timeline =
+    const analytics =
         await this.aggregate
-            .getAnalytics(
-            range as
-            '1D'
-            | '7D'
-            | '1M'
-            | '1Y',
+            .getRevenueTimeline(
 
-            storeId
+                storeId,
+
+                range as
+
+                '1D'
+                | '7D'
+                | '1M'
+                | '1Y',
             );
 
-        return {
+    const totalRevenue =
+        analytics.timeline.reduce(
+
+            (
+                sum,
+
+                row,
+            ) =>
+
+                sum +
+                row.revenue,
+
+            0,
+        );
+
+    const totalOrders =
+        analytics.timeline.reduce(
+
+            (
+                sum,
+
+                row,
+            ) =>
+
+                sum +
+                row.orders,
+
+            0,
+        );
+
+    return {
 
         data: {
 
-            timeline,
+            timeline:
 
-            totalRevenue:
-            timeline.reduce(
-                (
-                a,
-                b
-                ) =>
-                a +
-                Number(
-                    b.subtotal ??
-                    0
-                ),
+                analytics.timeline,
 
-                0
-            ),
+            totalRevenue,
 
-            totalOrders:
-            timeline.length,
+            totalOrders,
 
             growth:
-            0
-        }
-        };
-    }
+
+                analytics
+                    .revenueGrowth
+                    ?.growth
+                ??
+                0,
+
+            revenueGrowth:
+
+                analytics
+                    .revenueGrowth,
+
+            period:
+
+                analytics
+                    .period,
+        },
+    };
+}
 
     async topProducts(storeId: string) {
 
@@ -170,17 +205,20 @@ export class SellerDashboardService {
                 ...r,
 
                 // Match Admin response shape
-                images: r.product?.imageUrl
-                ? [
-                    {
-                        url: r.product.imageUrl,
-                    },
-                    ]
-                : (
-                    r.product?.images?.map((img) => ({
-                        url: img.url,
-                    })) ?? []
-                    ),
+                images:
+                    r.product?.images?.length
+                        ? r.product.images.map(
+                            img => ({
+                                url: img.url,
+                            }),
+                        )
+                        : r.product?.imageUrl
+                            ? [
+                                {
+                                    url: r.product.imageUrl,
+                                },
+                            ]
+                            : [],
 
                 user: {
                 customer: {
