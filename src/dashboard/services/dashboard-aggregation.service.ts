@@ -10,10 +10,7 @@ export class DashboardAggregationService {
         private prisma: PrismaService
     ) {}
 
-    async getMetrics(
-        storeId?: string
-    ) {
-
+    async getMetrics(storeId?: string) {
         const productIds =
             storeId
                 ? (
@@ -47,40 +44,32 @@ export class DashboardAggregationService {
         ] = await Promise.all([
 
             this.prisma.orderItem.findMany({
-
                 where: orderItemWhere,
-
                 distinct: [
                     'orderId'
                 ],
-
                 select: {
                     orderId: true
                 }
             }),
 
             this.prisma.orderItem.aggregate({
-
                 where: orderItemWhere,
-
                 _sum: {
                     subtotal: true
                 }
             }),
 
             this.prisma.order.findMany({
-
                 distinct: [
                     'userId'
                 ],
-
                 select: {
                     userId: true
                 }
             }),
 
             this.prisma.review.count({
-
                 where:
                     storeId
                         ? {
@@ -90,6 +79,7 @@ export class DashboardAggregationService {
                         }
                         : {}
             })
+
         ]);
 
         return {
@@ -225,24 +215,6 @@ export class DashboardAggregationService {
         storeId?: string
     ) {
 
-        const productIds =
-            storeId
-                ? (
-                    await this.prisma.product.findMany({
-
-                        where: {
-                            storeId
-                        },
-
-                        select: {
-                            id: true
-                        }
-                    })
-                ).map(
-                    p => p.id
-                )
-                : [];
-
         return this.prisma.orderItem.groupBy({
 
             by: [
@@ -253,25 +225,20 @@ export class DashboardAggregationService {
 
                 ...(storeId && {
 
-                    productId: {
-                        in:
-                            productIds
+                    product: {
+                        storeId
                     }
                 })
             },
 
             _sum: {
-
-                quantity:
-                    true
+                quantity: true
             },
 
             orderBy: {
 
                 _sum: {
-
-                    quantity:
-                        'desc'
+                    quantity: 'desc'
                 }
             },
 
