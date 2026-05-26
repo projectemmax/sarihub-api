@@ -22,6 +22,10 @@ export class AdminCategoriesController {
     constructor(private readonly categoriesService: CategoriesService) {}
 
     @Get()
+    @Roles(
+        'ADMIN',
+        'SELLER'
+    )
     getCategories() {
         return this.categoriesService.getAdminCategories();
     }

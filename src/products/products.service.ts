@@ -203,7 +203,10 @@ export class ProductsService {
     // ==========================
     // ADMIN: GET PRODUCTS
     // ==========================
-    async getAdminProducts(query: any) {
+    async getAdminProducts(
+        query: any,
+        user: any
+    ) {
         const page = Number(query.page) || 1;
         const limit = Number(query.limit) || 10;
         const skip = (page - 1) * limit;
@@ -218,6 +221,19 @@ export class ProductsService {
         } = query;
 
         const where: any = {};
+
+        if (
+            user.role === 'SELLER'
+        ) {
+
+            if (!user.storeId) {
+                throw new ConflictException(
+                    'Seller has no store'
+                );
+            }
+
+            where.storeId = user.storeId;
+        }
 
         const toBoolean = (v: any) =>
             v === undefined ? undefined : v === 'true' || v === true;
@@ -267,7 +283,10 @@ export class ProductsService {
     // ==========================
     // ADMIN: CREATE PRODUCT
     // ==========================
-    async createProduct(body: any) {
+    async createProduct(
+        body: any,
+        user: any
+    ) {
         const {
             sku,
             name,
@@ -307,58 +326,76 @@ export class ProductsService {
 
         const baseSku = sku || `${slug}-default`;
 
+        let storeId = body.storeId;
+
+        if (
+            user.role === 'SELLER'
+        ) {
+
+            if (!user.storeId) {
+                throw new ConflictException(
+                    'Seller has no store'
+                );
+            }
+
+            storeId =
+                user.storeId;
+        }
+
         return this.prisma.product.create({
             data: {
-            name,
-            slug,
-            description,
-            categoryId,
-            isFeatured,
-            isBestSeller,
-            status: status ?? 'DRAFT',
-            isActive: true,
+                storeId,
+                name,
+                slug,
+                description,
+                categoryId,
+                isFeatured,
+                isBestSeller,
+                status: status ?? 'DRAFT',
+                isActive: true,
 
-            variantOptions: variantOptions?.length ? variantOptions : null,
+                variantOptions: variantOptions?.length ? variantOptions : null,
 
-            
+                // ✅ FALLBACK (simple product)
+                sku: baseSku,
+                price: variants.length ? 0 : price,
+                stock: variants.length ? 0 : stock,
 
-            // ✅ FALLBACK (simple product)
-            sku: baseSku,
-            price: variants.length ? 0 : price,
-            stock: variants.length ? 0 : stock,
+                // ✅ VARIANTS (if exists)
+                variants: variants.length
+                    ? {
+                        create: variants.map((v: any) => ({
+                            sku: v.sku,
+                            price: Number(v.price),
+                            stock: Number(v.stock),
+                            attributes: v.attributes,
+                            image: v.image || null
+                        })),
+                    }
+                    : undefined,
 
-            // ✅ VARIANTS (if exists)
-            variants: variants.length
-                ? {
-                    create: variants.map((v: any) => ({
-                        sku: v.sku,
-                        price: Number(v.price),
-                        stock: Number(v.stock),
-                        attributes: v.attributes,
-                        image: v.image || null
-                    })),
-                }
-                : undefined,
-
-            // ✅ IMAGES
-            images: images.length
-                ? {
-                    create: images.map((img: any, index: number) => ({
-                    url: img.url,
-                    isPrimary: img.isPrimary,
-                    order: index,
-                    })),
-                }
-                : undefined,
-            },
-            include: {
-            variants: true,
-            images: true,
+                // ✅ IMAGES
+                images: images.length
+                    ? {
+                        create: images.map((img: any, index: number) => ({
+                        url: img.url,
+                        isPrimary: img.isPrimary,
+                        order: index,
+                        })),
+                    }
+                    : undefined,
+                },
+                include: {
+                variants: true,
+                images: true,
             },
         });
     }
 
-    async getProductById(id: string) {
+    async getProductById(
+        id: string,
+        user: any
+    ) {
         const product = await this.prisma.product.findUnique({
             where: { id },
             include: {
@@ -372,13 +409,28 @@ export class ProductsService {
             throw new NotFoundException('Product not found');
         }
 
+        if (
+            user.role === 'SELLER'
+            &&
+            product.storeId !==
+                user.storeId
+        ) {
+            throw new NotFoundException(
+                'Product not found'
+            );
+        }
+
         return { data: product };
     }
 
     // ==========================
     // ADMIN: UPDATE PRODUCT
     // ==========================
-    async updateProduct(id: string, body: any) {
+    async updateProduct(
+        id: string, 
+        body: any,
+        user: any
+    ) {
         const existing = await this.prisma.product.findUnique({
             where: { id },
             include: {
@@ -389,6 +441,16 @@ export class ProductsService {
 
         if (!existing) {
             throw new NotFoundException('Product not found');
+        }
+
+        if (
+            user.role === 'SELLER'
+            &&
+            existing.storeId !== user.storeId
+        ) {
+            throw new BadRequestException(
+                'Access denied'
+            );
         }
 
         const {
@@ -684,5 +746,6 @@ export class ProductsService {
             url: uploaded.url
         };
     }
+
 
 }
