@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Param, Body, Patch } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { ORDER_STATUS_TRANSITIONS } from './order-status-transition';
@@ -8,6 +8,7 @@ import { RedisService } from 'src/redis/redis.service';
 import { AdminOrdersQueryDto } from './dto/admin-orders-query.dto';
 import { AdminUpdateOrderStatusDto } from './dto/admin-update-order-status.dto';
 import { AdminShipOrderDto } from './dto/admin-ship-order.dto';
+import type { AuthUser } from '../auth/interfaces/auth-user.interface';
 
 @Injectable()
 export class OrdersService {
@@ -230,6 +231,8 @@ export class OrdersService {
                     paymentMethod: payload.paymentMethod,
                     messageForSeller: payload.messageForSeller,
 
+                    storeId: cart.items[0]?.storeId,
+
                     shippingFee: payload.shippingFee,
                     shippingName: payload.shippingName,
                     shippingPhone: payload.shippingPhone,
@@ -242,7 +245,7 @@ export class OrdersService {
                 },
                 include: {
                     items: {
-                    orderBy: { createdAt: 'asc' },
+                        orderBy: { createdAt: 'asc' },
                     },
                 },
             });
@@ -299,72 +302,6 @@ export class OrdersService {
                 total,
                 totalPages: Math.ceil(total / safeLimit)
             }
-        };
-    }
-
-    async getSellerOrders(
-        userId: string,
-        page = 1,
-        limit = 10,
-    ) {
-
-        const seller = await this.prisma.user.findUnique({
-            where: {id: userId,},
-            select: {
-                storeId: true,
-            },
-        });
-
-        if (!seller?.storeId) {
-            throw new ForbiddenException(
-                'Seller has no assigned store',
-            );
-        }
-
-        const skip = (page - 1) * limit;
-
-        const where = {
-            status: {
-                not: OrderStatus.DRAFT,
-            },
-            items: {
-                some: {
-                    storeId: seller.storeId,
-                },
-            },
-        };
-
-        const [orders, total] = await Promise.all([
-            this.prisma.order.findMany({
-                where,
-                include: {
-                    user: true,
-                    items: {
-                        where: {
-                        storeId:
-                            seller.storeId,
-                        },
-                    },
-                },
-                orderBy: {
-                    createdAt: 'desc',
-                },
-                skip,
-                take: limit,
-            }),
-
-            this.prisma.order.count({
-                where,
-            }),
-        ]);
-
-        return {
-            data: orders,
-            meta: {
-                page,
-                limit,
-                total,
-            },
         };
     }
 
@@ -513,7 +450,10 @@ export class OrdersService {
     }
 
     // Admin methods
-    async getAdminOrders(query: AdminOrdersQueryDto) {
+    async getAdminOrders(
+        query: AdminOrdersQueryDto,
+        user?: AuthUser,
+    ) {
         const page = Number(query.page || 1);
         const limit = Number(query.limit || 10);
         const skip = (page - 1) * limit;
@@ -822,6 +762,257 @@ export class OrdersService {
                 provider: 'PAYMONGO'
             }
         });
+    }
+
+    // SELLER RELATED METHODS CAN BE ADDED HERE
+
+    async getSellerOrders(
+        userId: string,
+        page = 1,
+        limit = 10,
+        status?: string,
+        search?: string,
+    ) {
+
+        const seller = await this.prisma.user.findUnique({
+            where: {id: userId,},
+            select: {
+                storeId: true,
+            },
+        });
+
+        if (!seller?.storeId) {
+            throw new ForbiddenException(
+                'Seller has no assigned store',
+            );
+        }
+
+        const skip = (page - 1) * limit;
+
+        const where: any = {
+            status: {
+                not: OrderStatus.DRAFT,
+            },
+
+            items: {
+                some: {
+                    storeId:
+                        seller.storeId,
+                },
+            },
+        };
+
+        // FILTER TAB
+        if (
+            status
+            &&
+            status !== 'ALL'
+        ) {
+            where.status = status;
+        }
+
+        // SEARCH
+        if (
+            search
+        ) {
+
+            where.OR = [
+
+                {
+                    orderNumber: {
+                        contains: search,
+                        mode: 'insensitive',
+                    },
+                },
+
+                {
+                    user: {
+                        email: {
+                            contains: search,
+                            mode: 'insensitive',
+                        },
+                    },
+                },
+            ];
+        }
+
+        const [orders, total] = await Promise.all([
+            this.prisma.order.findMany({
+                where,
+                include: {
+                    user: true,
+                    items: {
+                        where: {
+                        storeId:
+                            seller.storeId,
+                        },
+                    },
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+                skip,
+                take: limit,
+            }),
+
+            this.prisma.order.count({
+                where,
+            }),
+        ]);
+
+        return {
+            data: orders,
+            meta: {
+                page,
+                limit,
+                total,
+            },
+        };
+    }
+
+    async getSellerOrderById(
+        id: string,
+        userId: string,
+    ) {
+        const seller = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            },
+            select: {
+                storeId: true
+            }
+        });
+
+        if (
+            !seller?.storeId
+        ) {
+            throw new NotFoundException(
+                'Order not found'
+            );
+        }
+
+        const order = await this.prisma.order.findFirst({
+            where: {
+                id,
+                storeId: seller.storeId,
+            },
+            include: {
+                user: true,
+                items: true,
+                statusHistory: {
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                },
+                paymentTransaction: true
+            }
+        });
+
+        if (
+            !order
+        ) {
+            throw new NotFoundException(
+                'Order not found'
+            );
+        }
+
+        return order;
+
+    }
+
+
+    async updateSellerOrderStatus(
+        id: string,
+        dto: AdminUpdateOrderStatusDto,
+        userId: string,
+    ) {
+
+        const seller =
+            await this.prisma.user.findUnique({
+                where: {
+                    id: userId
+                },
+                select: {
+                    storeId: true
+                }
+            });
+
+        if (!seller?.storeId) {
+            throw new NotFoundException(
+                'Seller store not found'
+            );
+        }
+
+        const order =
+            await this.prisma.order.findFirst({
+                where: {
+                    id,
+                    storeId:
+                        seller.storeId
+                },
+                select: {
+                    id: true
+                }
+            });
+
+        if (!order) {
+            throw new NotFoundException(
+                'Order not found'
+            );
+        }
+
+        return this.updateAdminOrderStatus(
+            id,
+            dto,
+            userId
+        );
+    }
+
+    async shipSellerOrder(
+        id: string,
+        dto: AdminShipOrderDto,
+        userId: string,
+    ) {
+
+        const seller =
+            await this.prisma.user.findUnique({
+                where: {
+                    id: userId
+                },
+                select: {
+                    storeId: true
+                }
+            });
+
+        if (!seller?.storeId) {
+            throw new NotFoundException(
+                'Seller store not found'
+            );
+        }
+
+        const order =
+            await this.prisma.order.findFirst({
+                where: {
+                    id,
+                    storeId:
+                        seller.storeId
+                },
+                select: {
+                    id: true
+                }
+            });
+
+        if (!order) {
+            throw new NotFoundException(
+                'Order not found'
+            );
+        }
+
+        return this.shipAdminOrder(
+            id,
+            dto,
+            userId
+        );
     }
 
 }
