@@ -25,6 +25,7 @@ import { PaymentModule } from './payment/payment.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MediaModule } from './media/media.module';
 import { SellerDashboardModule } from './seller-dashboard/seller-dashboard.module';
+import { AiModule } from './modules/ai/ai.module';
 
 
 @Module({
@@ -56,6 +57,7 @@ import { SellerDashboardModule } from './seller-dashboard/seller-dashboard.modul
     ScheduleModule.forRoot(),
     MediaModule,
     SellerDashboardModule,
+    AiModule,
   ],
   controllers: [AppController, LocationController],
   providers: [AppService, LocationService],

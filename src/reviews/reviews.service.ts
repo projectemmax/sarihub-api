@@ -432,4 +432,55 @@ export class ReviewsService {
         });
     }
 
+    //================= SELLER =================
+
+    async getSellerReviews(userId: string) {
+
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            },
+            select: {
+                storeId: true
+            }
+        });
+
+        if (!user?.storeId) {
+            return {
+                success: true,
+                message: null,
+                data: {
+                    data: []
+                }
+            };
+        }
+
+        const reviews = await this.prisma.review.findMany({
+            where: {
+                product: {
+                    storeId: user.storeId
+                }
+            },
+            include: {
+                product: {
+                    include: {
+                        images: true
+                    }
+                },
+                user: {
+                    include: {
+                        customer: true
+                    }
+                },
+                images: true
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        return reviews;
+
+    }
+
 }
