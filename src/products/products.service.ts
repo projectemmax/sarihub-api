@@ -38,7 +38,6 @@ export class ProductsService {
             status: 'PUBLISHED',
             category: {
                 isActive: true,
-                deletedAt: null,
             },
         };
 
@@ -94,7 +93,15 @@ export class ProductsService {
                     category: { 
                         select: { 
                             id: true, 
-                            name: true 
+                            name: true,
+                            slug: true,
+                            parent: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    slug: true,
+                                },
+                            },
                         } 
                     },
                     variants: {
@@ -137,7 +144,20 @@ export class ProductsService {
         const product = await this.prisma.product.findFirst({
             where: { slug, status: 'PUBLISHED', isActive: true },
             include: {
-                category: { select: { id: true, name: true } },
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        parent: {
+                            select: {
+                                id: true,
+                                name: true,
+                                slug: true,
+                            },
+                        },
+                    },
+                },
                 reviews: { select: { rating: true } },
                 variants: {
                     orderBy: {
@@ -258,7 +278,20 @@ export class ProductsService {
                 skip,
                 take: limit,
                 include: {
-                    category: { select: { id: true, name: true } },
+                    category: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                            parent: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    slug: true,
+                                },
+                            },
+                        },
+                    },
                     variants: true,
                     images: true,
                 },

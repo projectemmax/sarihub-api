@@ -6,6 +6,11 @@ import { CategoriesService } from './categories.service';
 export class StorefrontCategoriesController {
     constructor(private readonly categoriesService: CategoriesService) {}
 
+    @Get('tree')
+    getCategoryTree() {
+        return this.categoriesService.getCategoryTree();
+    }
+
     @Get()
     getStorefrontCategories() {
         return this.categoriesService.getStorefrontCategories();

@@ -66,14 +66,20 @@ model ProductImage {
 }
 
 model Category {
-  id              String    @id @default(uuid())
-  name            String    @unique
-  isActive        Boolean   @default(true)
-  deletedAt       DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  variantTemplate Json?
-  products        Product[]
+  id        String     @id @default(uuid())
+  name      String
+  slug      String     @unique
+  parentId  String?
+  isActive  Boolean    @default(true)
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Category[] @relation("CategoryHierarchy")
+  products  Product[]
+
+  @@index([parentId])
+  @@index([isActive, sortOrder])
 }
 
 model User {

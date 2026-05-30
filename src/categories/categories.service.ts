@@ -1,7 +1,27 @@
 /* eslint-disable prettier/prettier */
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    NotFoundException
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import {
+    AdminCategoryTreeNode,
+    CategoryTreeNode
+} from './interfaces/category-tree.interface';
+
+type CategoryRecord = {
+    id: string;
+    name: string;
+    slug: string;
+    parentId: string | null;
+    isActive: boolean;
+    sortOrder: number;
+};
 
 @Injectable()
 export class CategoriesService {
@@ -11,15 +31,25 @@ export class CategoriesService {
         const categories = await this.prisma.category.findMany({
             where: {
                 isActive: true,
-                deletedAt: null,
             },
-            orderBy: { name: 'asc' },
+            orderBy: [
+                { sortOrder: 'asc' },
+                { name: 'asc' },
+            ],
             include: {
+                parent: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    },
+                },
                 _count: {
                     select: {
                         products: {
                             where: { isActive: true },
                         },
+                        children: true,
                     },
                 },
             },
@@ -29,10 +59,77 @@ export class CategoriesService {
             data: categories.map((c) => ({
                 id: c.id,
                 name: c.name,
+                slug: c.slug,
+                parentId: c.parentId,
+                parent: c.parent,
+                isActive: c.isActive,
+                sortOrder: c.sortOrder,
                 productCount: c._count.products,
-                variantTemplate: c.variantTemplate,
+                childrenCount: c._count.children,
             })),
         };
+    }
+
+    async getCategoryTree(): Promise<CategoryTreeNode[]> {
+        const categories = await this.prisma.category.findMany({
+            where: { isActive: true },
+            orderBy: [
+                { sortOrder: 'asc' },
+                { name: 'asc' },
+            ],
+        });
+
+        return this.buildPublicTree(categories);
+    }
+
+    async getAdminCategoryTree(): Promise<AdminCategoryTreeNode[]> {
+        const categories = await this.prisma.category.findMany({
+            orderBy: [
+                { sortOrder: 'asc' },
+                { name: 'asc' },
+            ],
+        });
+
+        return this.buildAdminTree(categories);
+    }
+
+    async getCategoryPath(categoryId: string): Promise<CategoryTreeNode[]> {
+        const path: CategoryTreeNode[] = [];
+        let cursor = await this.prisma.category.findUnique({
+            where: { id: categoryId },
+            select: {
+                id: true,
+                name: true,
+                parentId: true,
+            },
+        });
+
+        if (!cursor) {
+            throw new NotFoundException('Category not found');
+        }
+
+        while (cursor) {
+            path.unshift({
+                id: cursor.id,
+                name: cursor.name,
+                children: [],
+            });
+
+            if (!cursor.parentId) {
+                break;
+            }
+
+            cursor = await this.prisma.category.findUnique({
+                where: { id: cursor.parentId },
+                select: {
+                    id: true,
+                    name: true,
+                    parentId: true,
+                },
+            });
+        }
+
+        return path;
     }
 
     // ==========================
@@ -41,7 +138,25 @@ export class CategoriesService {
     async getAdminCategories() {
         return {
             data: await this.prisma.category.findMany({
-            orderBy: { createdAt: 'desc' },
+                orderBy: [
+                    { sortOrder: 'asc' },
+                    { name: 'asc' },
+                ],
+                include: {
+                    parent: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                        },
+                    },
+                    _count: {
+                        select: {
+                            products: true,
+                            children: true,
+                        },
+                    },
+                },
             }),
         };
     }
@@ -49,27 +164,25 @@ export class CategoriesService {
     // ==========================
     // ADMIN: CREATE
     // ==========================
-    async createCategory(body: any) {
-        const { name, isActive = true } = body;
+    async createCategory(body: CreateCategoryDto) {
+        const name = body.name?.trim();
 
-        if (!name?.trim()) {
+        if (!name) {
             throw new BadRequestException('Name is required');
         }
 
-        // 🔥 CLEAN TEMPLATE HERE
-        const cleanTemplate = {
-            attributes:
-                body.variantTemplate?.attributes
-                ?.filter((v) => v?.trim())
-                .map((v) => v.trim()) ?? [],
-        };
+        const parentId = body.parentId || null;
+
+        await this.assertParentExists(parentId);
 
         try {
             const category = await this.prisma.category.create({
                 data: {
-                    name: name.trim(),
-                    isActive,
-                    variantTemplate: cleanTemplate, // ✅ USE CLEANED DATA
+                    name,
+                    slug: await this.generateUniqueSlug(name),
+                    parentId,
+                    isActive: body.isActive ?? true,
+                    sortOrder: body.sortOrder ?? 0,
                 },
             });
 
@@ -78,13 +191,7 @@ export class CategoriesService {
                 data: category,
             };
         } catch (err) {
-            if (
-                err instanceof Prisma.PrismaClientKnownRequestError &&
-                err.code === 'P2002'
-            ) {
-                throw new ConflictException('Category name already exists');
-            }
-            throw err;
+            this.handleCategoryWriteError(err);
         }
     }
 
@@ -93,28 +200,39 @@ export class CategoriesService {
     // ==========================
     async updateCategory(
         id: string,
-        body: { 
-            name?: string; 
-            isActive?: boolean;
-            variantTemplate?: {
-                attributes: string[];
-            }; 
-        },
+        body: UpdateCategoryDto,
     ) {
-        try {
-            const cleanTemplate = {
-                attributes:
-                    body.variantTemplate?.attributes
-                    ?.filter((v) => v?.trim())
-                    .map((v) => v.trim()) ?? [],
-            };
+        const existing = await this.prisma.category.findUnique({
+            where: { id },
+        });
 
+        if (!existing) {
+            throw new NotFoundException('Category not found');
+        }
+
+        if (body.parentId !== undefined) {
+            await this.assertParentCanBeAssigned(id, body.parentId || null);
+        }
+
+        const name = body.name?.trim();
+
+        try {
             const category = await this.prisma.category.update({
                 where: { id },
                 data: {
-                    name: body.name,
-                    isActive: body.isActive,
-                    variantTemplate: cleanTemplate
+                    ...(name && {
+                        name,
+                        slug: await this.generateUniqueSlug(name, id),
+                    }),
+                    ...(body.parentId !== undefined && {
+                        parentId: body.parentId || null,
+                    }),
+                    ...(body.isActive !== undefined && {
+                        isActive: body.isActive,
+                    }),
+                    ...(body.sortOrder !== undefined && {
+                        sortOrder: body.sortOrder,
+                    }),
                 },
             });
 
@@ -123,32 +241,201 @@ export class CategoriesService {
                 data: category,
             };
         } catch (err) {
-            if (
-                err instanceof Prisma.PrismaClientKnownRequestError &&
-                err.code === 'P2002'
-            ) {
-                throw new ConflictException('Category name already exists');
-            }
-            throw err;
+            this.handleCategoryWriteError(err);
         }
     }
 
     // ==========================
-    // ADMIN: SOFT DELETE
+    // ADMIN: DELETE
     // ==========================
-    async softDeleteCategory(id: string) {
-        const category = await this.prisma.category.findUnique({ where: { id } });
+    async deleteCategory(id: string) {
+        const category = await this.prisma.category.findUnique({
+            where: { id },
+            include: {
+                _count: {
+                    select: {
+                        children: true,
+                        products: true,
+                    },
+                },
+            },
+        });
 
         if (!category) {
             throw new NotFoundException('Category not found');
         }
 
-        await this.prisma.category.update({
+        if (category._count.children > 0) {
+            throw new BadRequestException(
+                'Cannot delete a category that has subcategories',
+            );
+        }
+
+        if (category._count.products > 0) {
+            throw new BadRequestException(
+                'Cannot delete a category that has products',
+            );
+        }
+
+        await this.prisma.category.delete({
             where: { id },
-            data: {
-                deletedAt: new Date(),
-                isActive: false,
+        });
+    }
+
+    private buildPublicTree(categories: CategoryRecord[]): CategoryTreeNode[] {
+        const nodes = new Map<string, CategoryTreeNode>();
+        const roots: CategoryTreeNode[] = [];
+
+        categories.forEach((category) => {
+            nodes.set(category.id, {
+                id: category.id,
+                name: category.name,
+                children: [],
+            });
+        });
+
+        categories.forEach((category) => {
+            const node = nodes.get(category.id);
+            if (!node) return;
+
+            if (category.parentId && nodes.has(category.parentId)) {
+                nodes.get(category.parentId)?.children.push(node);
+            } else if (!category.parentId) {
+                roots.push(node);
+            }
+        });
+
+        return roots;
+    }
+
+    private buildAdminTree(categories: CategoryRecord[]): AdminCategoryTreeNode[] {
+        const nodes = new Map<string, AdminCategoryTreeNode>();
+        const roots: AdminCategoryTreeNode[] = [];
+
+        categories.forEach((category) => {
+            nodes.set(category.id, {
+                id: category.id,
+                name: category.name,
+                slug: category.slug,
+                parentId: category.parentId,
+                isActive: category.isActive,
+                sortOrder: category.sortOrder,
+                children: [],
+            });
+        });
+
+        categories.forEach((category) => {
+            const node = nodes.get(category.id);
+            if (!node) return;
+
+            if (category.parentId && nodes.has(category.parentId)) {
+                nodes.get(category.parentId)?.children.push(node);
+            } else if (!category.parentId) {
+                roots.push(node);
+            }
+        });
+
+        return roots;
+    }
+
+    private async assertParentExists(parentId: string | null) {
+        if (!parentId) return;
+
+        const parent = await this.prisma.category.findUnique({
+            where: { id: parentId },
+            select: { id: true },
+        });
+
+        if (!parent) {
+            throw new BadRequestException('Parent category does not exist');
+        }
+    }
+
+    private async assertParentCanBeAssigned(
+        categoryId: string,
+        parentId: string | null,
+    ) {
+        if (!parentId) return;
+
+        if (categoryId === parentId) {
+            throw new BadRequestException('A category cannot be its own parent');
+        }
+
+        let parent = await this.prisma.category.findUnique({
+            where: { id: parentId },
+            select: {
+                id: true,
+                parentId: true,
             },
         });
+
+        if (!parent) {
+            throw new BadRequestException('Parent category does not exist');
+        }
+
+        while (parent) {
+            if (parent.id === categoryId) {
+                throw new BadRequestException(
+                    'A category cannot be moved below its own descendant',
+                );
+            }
+
+            if (!parent.parentId) {
+                break;
+            }
+
+            parent = await this.prisma.category.findUnique({
+                where: { id: parent.parentId },
+                select: {
+                    id: true,
+                    parentId: true,
+                },
+            });
+        }
+    }
+
+    private generateSlug(value: string): string {
+        return value
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '');
+    }
+
+    private async generateUniqueSlug(
+        name: string,
+        excludeId?: string,
+    ): Promise<string> {
+        const baseSlug = this.generateSlug(name);
+        let slug = baseSlug || 'category';
+        let counter = 2;
+
+        while (
+            await this.prisma.category.findFirst({
+                where: {
+                    slug,
+                    ...(excludeId && {
+                        NOT: { id: excludeId },
+                    }),
+                },
+                select: { id: true },
+            })
+        ) {
+            slug = `${baseSlug}-${counter}`;
+            counter++;
+        }
+
+        return slug;
+    }
+
+    private handleCategoryWriteError(err: unknown): never {
+        if (
+            err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === 'P2002'
+        ) {
+            throw new ConflictException('Category slug already exists');
+        }
+
+        throw err;
     }
 }
