@@ -217,24 +217,53 @@ export class CategoriesService {
         const name = body.name?.trim();
 
         try {
-            const category = await this.prisma.category.update({
-                where: { id },
-                data: {
-                    ...(name && {
-                        name,
-                        slug: await this.generateUniqueSlug(name, id),
-                    }),
-                    ...(body.parentId !== undefined && {
-                        parentId: body.parentId || null,
-                    }),
-                    ...(body.isActive !== undefined && {
-                        isActive: body.isActive,
-                    }),
-                    ...(body.sortOrder !== undefined && {
-                        sortOrder: body.sortOrder,
-                    }),
+            const category = await this.prisma.$transaction(
+                async (tx) => {
+
+                    const updatedCategory =
+                        await tx.category.update({
+                            where: { id },
+                            data: {
+                                ...(name && {
+                                    name,
+                                    slug: await this.generateUniqueSlug(name, id),
+                                }),
+                                ...(body.parentId !== undefined && {
+                                    parentId: body.parentId || null,
+                                }),
+                                ...(body.isActive !== undefined && {
+                                    isActive: body.isActive,
+                                }),
+                                ...(body.sortOrder !== undefined && {
+                                    sortOrder: body.sortOrder,
+                                }),
+                            },
+                        });
+
+                    // Cascade deactivate descendants
+                    if (body.isActive === false) {
+
+                        const descendantIds =
+                            await this.getDescendantIds(id);
+
+                        if (descendantIds.length) {
+
+                            await tx.category.updateMany({
+                                where: {
+                                    id: {
+                                        in: descendantIds,
+                                    },
+                                },
+                                data: {
+                                    isActive: false,
+                                },
+                            });
+                        }
+                    }
+
+                    return updatedCategory;
                 },
-            });
+            );
 
             return {
                 message: 'Category updated',
@@ -438,4 +467,33 @@ export class CategoriesService {
 
         throw err;
     }
+
+    //============ Descendants ACTIVE and INACTIVE ==============
+
+    private async getDescendantIds(
+        categoryId: string,
+    ): Promise<string[]> {
+
+        const descendants: string[] = [];
+
+        const collect = async (parentId: string) => {
+
+            const children = await this.prisma.category.findMany({
+                where: { parentId },
+                select: { id: true },
+            });
+
+            for (const child of children) {
+
+                descendants.push(child.id);
+
+                await collect(child.id);
+            }
+        };
+
+        await collect(categoryId);
+
+        return descendants;
+    }
+
 }

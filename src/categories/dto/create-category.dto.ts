@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -22,8 +23,11 @@ export class CreateCategoryDto {
     example: '7a5c25b1-6a71-4a68-8e1d-a6c24140fbf4',
     nullable: true,
   })
+  @Transform(({ value }) =>
+      value === '' ? null : value
+  )
   @IsOptional()
-  @IsString()
+  @IsUUID()
   parentId?: string | null;
 
   @ApiPropertyOptional({ example: true, default: true })
