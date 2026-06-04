@@ -9,5 +9,9 @@ export interface AdminCategoryTreeNode extends CategoryTreeNode {
   parentId: string | null;
   isActive: boolean;
   sortOrder: number;
+
+  childCount: number;
+  descendantCount: number;
+
   children: AdminCategoryTreeNode[];
 }

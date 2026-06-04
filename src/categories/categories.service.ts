@@ -349,6 +349,8 @@ export class CategoriesService {
                 parentId: category.parentId,
                 isActive: category.isActive,
                 sortOrder: category.sortOrder,
+                childCount: 0,
+                descendantCount: 0,
                 children: [],
             });
         });
@@ -364,7 +366,34 @@ export class CategoriesService {
             }
         });
 
+        const populateCounts = (
+            node: AdminCategoryTreeNode,
+        ) => {
+            node.childCount = node.children.length;
+            node.descendantCount =
+                this.calculateDescendantCount(node);
+
+            node.children.forEach(populateCounts);
+        };
+
+        roots.forEach(populateCounts);
+
         return roots;
+    }
+
+    private calculateDescendantCount(
+        node: AdminCategoryTreeNode,
+    ): number {
+
+        if (!node.children.length) {
+            return 0;
+        }
+
+        return node.children.reduce(
+            (total, child) =>
+                total + 1 + this.calculateDescendantCount(child),
+            0,
+        );
     }
 
     private async assertParentExists(parentId: string | null) {
@@ -495,5 +524,7 @@ export class CategoriesService {
 
         return descendants;
     }
+
+    
 
 }
