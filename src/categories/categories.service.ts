@@ -210,8 +210,37 @@ export class CategoriesService {
             throw new NotFoundException('Category not found');
         }
 
-        if (body.parentId !== undefined) {
-            await this.assertParentCanBeAssigned(id, body.parentId || null);
+        if (
+            body.parentId !== undefined &&
+            body.parentId !== existing.parentId
+        ) {
+            await this.assertParentCanBeAssigned(
+                id,
+                body.parentId || null,
+            );
+        }
+
+        if (
+            body.isActive === true &&
+            existing.isActive === false &&
+            existing.parentId
+        ) {
+
+            const parent =
+                await this.prisma.category.findUnique({
+                    where: {
+                        id: existing.parentId,
+                    },
+                    select: {
+                        isActive: true,
+                    },
+                });
+
+            if (parent && !parent.isActive) {
+                throw new BadRequestException(
+                    'Parent category must be active first',
+                );
+            }
         }
 
         const name = body.name?.trim();
@@ -401,11 +430,17 @@ export class CategoriesService {
 
         const parent = await this.prisma.category.findUnique({
             where: { id: parentId },
-            select: { id: true },
+            select: { id: true, isActive: true },
         });
 
         if (!parent) {
             throw new BadRequestException('Parent category does not exist');
+        }
+
+        if (!parent.isActive) {
+            throw new BadRequestException(
+                'Cannot create a category under an inactive parent',
+            );
         }
     }
 
@@ -424,11 +459,18 @@ export class CategoriesService {
             select: {
                 id: true,
                 parentId: true,
+                isActive: true,
             },
         });
 
         if (!parent) {
             throw new BadRequestException('Parent category does not exist');
+        }
+
+        if (!parent.isActive) {
+            throw new BadRequestException(
+                'Cannot move category under an inactive parent',
+            );
         }
 
         while (parent) {
@@ -447,6 +489,7 @@ export class CategoriesService {
                 select: {
                     id: true,
                     parentId: true,
+                    isActive: true,
                 },
             });
         }
