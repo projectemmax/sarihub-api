@@ -67,8 +67,13 @@ export class SellerAiService {
   private cleanStringList(value: unknown[], limit: number): string[] {
     return value
       .filter((item): item is string => typeof item === 'string')
-      .map((item) => item.trim())
-      .filter(Boolean)
+      .flatMap(item =>
+        item
+          .split(',')
+          .map(tag => tag.trim())
+          .filter(Boolean)
+      )
+      .filter((tag, index, arr) => arr.indexOf(tag) === index)
       .slice(0, limit);
   }
 }
