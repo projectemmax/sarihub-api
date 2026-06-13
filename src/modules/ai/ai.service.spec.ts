@@ -46,15 +46,16 @@ describe('AiService', () => {
 
   it('requests JSON output and parses structured responses', async () => {
     provider.generateContent.mockResolvedValue(
-      '```json\n{"description":"Good","highlights":[],"keywords":[]}\n```',
+      '```json\n{"description":"Good","shortDescription":"Short","seoDescription":"SEO","tags":[]}\n```',
     );
 
     await expect(
       service.generateStructuredContent('Make JSON', { type: 'object' }),
     ).resolves.toEqual({
       description: 'Good',
-      highlights: [],
-      keywords: [],
+      shortDescription: 'Short',
+      seoDescription: 'SEO',
+      tags: [],
     });
 
     expect(provider.generateContent).toHaveBeenCalledWith('Make JSON', {

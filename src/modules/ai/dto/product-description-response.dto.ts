@@ -8,23 +8,18 @@ export class ProductDescriptionResponseDto {
   description: string;
 
   @ApiProperty({
-    example: [
-      'Bluetooth 5.3 for stable wireless listening',
-      'Noise cancelling for fewer distractions',
-      '20-hour battery for all-day use',
-    ],
-    type: [String],
+    example: 'Wireless earbuds with stable Bluetooth, noise cancelling, and long battery life.',
   })
-  highlights: string[];
+  shortDescription: string;
 
   @ApiProperty({
-    example: [
-      'wireless earbuds',
-      'bluetooth earbuds',
-      'noise cancelling earbuds',
-      'long battery earbuds',
-    ],
+    example: 'Shop wireless earbuds with Bluetooth 5.3, noise cancelling, and 20-hour battery life for clear everyday listening.',
+  })
+  seoDescription: string;
+
+  @ApiProperty({
+    example: ['Samsung', 'Android', '5G'],
     type: [String],
   })
-  keywords: string[];
+  tags: string[];
 }

@@ -24,6 +24,8 @@ export class GeminiProvider implements AiProvider {
   constructor(private readonly configService: ConfigService) {
     this.modelName =
       this.configService.get<string>('GEMINI_MODEL') ?? 'gemini-1.5-flash';
+
+      this.logger.log(`Using Gemini model: ${this.modelName}`);
   }
 
   async generateContent(

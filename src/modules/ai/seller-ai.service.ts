@@ -11,30 +11,34 @@ import {
 export class SellerAiService {
   constructor(private readonly aiService: AiService) {}
 
-  async generateProductDescription(
-    dto: GenerateProductDescriptionDto,
-  ): Promise<ProductDescriptionAiResult> {
-    const prompt = buildProductDescriptionPrompt({
-      name: dto.name,
-      features: dto.features,
-    });
+ async generateProductDescription(
+  dto: GenerateProductDescriptionDto,
+): Promise<ProductDescriptionAiResult> {
+  const prompt = buildProductDescriptionPrompt({
+    name: dto.name,
+    category: dto.category,
+    brand: dto.brand,
+    features: dto.features,
+    specifications: dto.specifications,
+  });
 
-    const result =
-      await this.aiService.generateStructuredContent<ProductDescriptionAiResult>(
-        prompt,
-        PRODUCT_DESCRIPTION_RESPONSE_SCHEMA,
-      );
+  const result =
+    await this.aiService.generateStructuredContent<ProductDescriptionAiResult>(
+      prompt,
+      PRODUCT_DESCRIPTION_RESPONSE_SCHEMA,
+    );
 
-    return this.normalizeProductDescription(result);
-  }
+  return this.normalizeProductDescription(result);
+}
 
   private normalizeProductDescription(
     result: ProductDescriptionAiResult,
   ): ProductDescriptionAiResult {
     if (
       typeof result?.description !== 'string' ||
-      !Array.isArray(result.highlights) ||
-      !Array.isArray(result.keywords)
+      typeof result?.shortDescription !== 'string' ||
+      typeof result?.seoDescription !== 'string' ||
+      !Array.isArray(result.tags)
     ) {
       throw new BadGatewayException(
         'AI provider returned an unexpected product description format.',
@@ -42,12 +46,11 @@ export class SellerAiService {
     }
 
     const description = result.description.trim();
-    const highlights = this.cleanStringList(result.highlights, 5);
-    const keywords = this.cleanStringList(result.keywords, 8).map((keyword) =>
-      keyword.toLowerCase(),
-    );
+    const shortDescription = result.shortDescription.trim();
+    const seoDescription = result.seoDescription.trim();
+    const tags = this.cleanStringList(result.tags, 8);
 
-    if (!description || highlights.length === 0 || keywords.length === 0) {
+    if (!description || !shortDescription || !seoDescription || tags.length === 0) {
       throw new BadGatewayException(
         'AI provider returned incomplete product description content.',
       );
@@ -55,8 +58,9 @@ export class SellerAiService {
 
     return {
       description,
-      highlights,
-      keywords,
+      shortDescription,
+      seoDescription,
+      tags,
     };
   }
 

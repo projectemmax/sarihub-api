@@ -44,14 +44,21 @@ export class AiService {
   }
 
   private parseJsonResponse<T>(response: string): T {
-    const normalized = response
-      .trim()
-      .replace(/^```(?:json)?/i, '')
-      .replace(/```$/i, '')
-      .trim();
+    const normalized = response.trim();
+
+    const start = normalized.indexOf('{');
+    const end = normalized.lastIndexOf('}');
+
+    if (start === -1 || end === -1) {
+      throw new BadGatewayException(
+        'AI provider returned invalid structured content.',
+      );
+    }
 
     try {
-      return JSON.parse(normalized) as T;
+      return JSON.parse(
+        normalized.substring(start, end + 1),
+      ) as T;
     } catch {
       throw new BadGatewayException(
         'AI provider returned invalid structured content.',

@@ -8,31 +8,33 @@ datasource db {
 }
 
 model Product {
-  id             String           @id @default(uuid())
-  name           String
-  description    String?
-  price          Decimal          @db.Decimal(10, 2)
-  isActive       Boolean          @default(true)
-  categoryId     String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  imageUrl       String?
-  stock          Int              @default(0)
-  sku            String           @unique
-  isBestSeller   Boolean          @default(false)
-  isFeatured     Boolean          @default(false)
-  slug           String           @unique
-  rating         Float            @default(0)
-  reviewCount    Int              @default(0)
-  variantOptions Json?
-  status         ProductStatus    @default(DRAFT)
-  storeId        String?
-  orderItems     OrderItem[]
-  category       Category         @relation(fields: [categoryId], references: [id])
-  store          Store?           @relation(fields: [storeId], references: [id])
-  images         ProductImage[]
-  variants       ProductVariant[]
-  reviews        Review[]
+  id               String           @id @default(uuid())
+  name             String
+  description      String?
+  shortDescription String?
+  seoDescription   String?
+  price            Decimal          @db.Decimal(10, 2)
+  isActive         Boolean          @default(true)
+  categoryId       String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  imageUrl         String?
+  stock            Int              @default(0)
+  sku              String           @unique
+  isBestSeller     Boolean          @default(false)
+  isFeatured       Boolean          @default(false)
+  slug             String           @unique
+  rating           Float            @default(0)
+  reviewCount      Int              @default(0)
+  variantOptions   Json?
+  status           ProductStatus    @default(DRAFT)
+  storeId          String?
+  orderItems       OrderItem[]
+  category         Category         @relation(fields: [categoryId], references: [id])
+  store            Store?           @relation(fields: [storeId], references: [id])
+  images           ProductImage[]
+  variants         ProductVariant[]
+  reviews          Review[]
 
   @@index([categoryId])
 }
@@ -315,12 +317,6 @@ model PaymentTransactionLog {
   payment   PaymentTransaction @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([paymentId])
-}
-
-model playing_with_neon {
-  id    Int    @id @default(autoincrement())
-  name  String
-  value Float? @db.Real
 }
 
 model Media {
