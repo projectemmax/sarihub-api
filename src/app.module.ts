@@ -26,6 +26,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { MediaModule } from './media/media.module';
 import { SellerDashboardModule } from './seller-dashboard/seller-dashboard.module';
 import { AiModule } from './modules/ai/ai.module';
+import { BrandsModule } from './modules/brands/brands.module';
 
 
 @Module({
@@ -58,6 +59,7 @@ import { AiModule } from './modules/ai/ai.module';
     MediaModule,
     SellerDashboardModule,
     AiModule,
+    BrandsModule,
   ],
   controllers: [AppController, LocationController],
   providers: [AppService, LocationService],
