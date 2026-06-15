@@ -8,35 +8,41 @@ datasource db {
 }
 
 model Product {
-  id               String           @id @default(uuid())
+  id               String        @id @default(uuid())
   name             String
   description      String?
   shortDescription String?
   seoDescription   String?
-  price            Decimal          @db.Decimal(10, 2)
-  isActive         Boolean          @default(true)
+  price            Decimal       @db.Decimal(10, 2)
+  isActive         Boolean       @default(true)
   categoryId       String
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  brandId          String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
   imageUrl         String?
-  stock            Int              @default(0)
-  sku              String           @unique
-  isBestSeller     Boolean          @default(false)
-  isFeatured       Boolean          @default(false)
-  slug             String           @unique
-  rating           Float            @default(0)
-  reviewCount      Int              @default(0)
+  stock            Int           @default(0)
+  sku              String        @unique
+  isBestSeller     Boolean       @default(false)
+  isFeatured       Boolean       @default(false)
+  slug             String        @unique
+  rating           Float         @default(0)
+  reviewCount      Int           @default(0)
   variantOptions   Json?
-  status           ProductStatus    @default(DRAFT)
+  status           ProductStatus @default(DRAFT)
   storeId          String?
-  orderItems       OrderItem[]
-  category         Category         @relation(fields: [categoryId], references: [id])
-  store            Store?           @relation(fields: [storeId], references: [id])
-  images           ProductImage[]
-  variants         ProductVariant[]
-  reviews          Review[]
+
+  orderItems OrderItem[]
+
+  category Category @relation(fields: [categoryId], references: [id])
+  brand    Brand?   @relation(fields: [brandId], references: [id])
+  store    Store?   @relation(fields: [storeId], references: [id])
+
+  images   ProductImage[]
+  variants ProductVariant[]
+  reviews  Review[]
 
   @@index([categoryId])
+  @@index([brandId])
 }
 
 model ProductVariant {
@@ -405,4 +411,22 @@ enum PaymentMethod {
   GCASH
   MAYA
   CARD
+}
+
+model Brand {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  logoUrl     String?
+  isVerified  Boolean @default(false)
+  isActive    Boolean @default(true)
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([slug])
 }
