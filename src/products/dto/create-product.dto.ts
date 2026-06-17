@@ -9,6 +9,8 @@ import {
   IsInt,
   IsEnum,
   MaxLength,
+  IsUUID,
+  ValidateIf,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -169,4 +171,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   isBestSeller?: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Brand ID. Set to null to remove brand association.',
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  brandId?: string | null;
+  
 }

@@ -22,15 +22,15 @@ export class ProductsService {
         const skip = (page - 1) * limit;
 
         const {
-        categoryId,
-        search,
-        sort,
-        status,
-        isFeatured,
-        isBestSeller,
-        inStock,
-        priceMin,
-        priceMax,
+            categoryId,
+            search,
+            sort,
+            status,
+            isFeatured,
+            isBestSeller,
+            inStock,
+            priceMin,
+            priceMax,
         } = query;
 
         const where: any = {
@@ -104,6 +104,14 @@ export class ProductsService {
                             },
                         } 
                     },
+                    brand: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                            logoUrl: true,
+                        },
+                    },
                     variants: {
                         orderBy: {
                             createdAt: 'asc',
@@ -156,6 +164,14 @@ export class ProductsService {
                                 slug: true,
                             },
                         },
+                    },
+                },
+                brand: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        logoUrl: true,
                     },
                 },
                 reviews: { select: { rating: true } },
@@ -292,6 +308,13 @@ export class ProductsService {
                             },
                         },
                     },
+                    brand: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                        },
+                    },
                     variants: true,
                     images: true,
                 },
@@ -328,6 +351,7 @@ export class ProductsService {
             seoDescription,
             price,
             categoryId,
+            brandId,
             stock,
             status,
             variants = [],
@@ -353,6 +377,21 @@ export class ProductsService {
             if (price === undefined || stock === undefined) {
                 throw new BadRequestException(
                     'Price and stock are required for simple product'
+                );
+            }
+        }
+
+        if (brandId !== undefined && brandId !== null) {
+            const brand = await this.prisma.brand.findFirst({
+                where: {
+                    id: brandId,
+                    isActive: true,
+                },
+            });
+
+            if (!brand) {
+                throw new BadRequestException(
+                    'Invalid brand selected',
                 );
             }
         }
@@ -386,6 +425,7 @@ export class ProductsService {
                 shortDescription,
                 seoDescription,
                 categoryId,
+                brandId,
                 isFeatured,
                 isBestSeller,
                 status: status ?? 'DRAFT',
@@ -425,6 +465,7 @@ export class ProductsService {
                 include: {
                 variants: true,
                 images: true,
+                brand: true,
             },
         });
     }
@@ -437,6 +478,7 @@ export class ProductsService {
             where: { id },
             include: {
                 category: true,
+                brand: true,
                 variants: true,
                 images: true  
             }
@@ -496,6 +538,7 @@ export class ProductsService {
             shortDescription,
             seoDescription,
             categoryId,
+            brandId,
             price,
             stock,
             variants,
@@ -507,7 +550,7 @@ export class ProductsService {
             status,
         } = body;
 
-        // 🔥 FAST PATH — status only update (skip heavy transaction)
+        // FAST PATH — status only update (skip heavy transaction)
         if (
             status !== undefined &&
             variants === undefined &&
@@ -520,6 +563,21 @@ export class ProductsService {
             });
         }
 
+        if (brandId) {
+            const brand = await this.prisma.brand.findFirst({
+                where: {
+                    id: brandId,
+                    isActive: true,
+                },
+            });
+
+            if (!brand) {
+                throw new BadRequestException(
+                    'Invalid brand selected',
+                );
+            }
+        }
+
         // 🚀 FULL TRANSACTION
         return this.prisma.$transaction(async (tx) => {
 
@@ -530,6 +588,7 @@ export class ProductsService {
                 where: { id },
                 data: {
                     ...(name && { name }),
+                    ...(brandId !== undefined && { brandId, }),
                     ...(description !== undefined && { description: description || null }),
                     ...(shortDescription !== undefined && { shortDescription: shortDescription || null }),
                     ...(seoDescription !== undefined && { seoDescription: seoDescription || null }),
@@ -651,7 +710,22 @@ export class ProductsService {
                 }
             }
 
-            return product;
+            return tx.product.findUnique({
+                where: { id },
+                include: {
+                    category: true,
+                    brand: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                            logoUrl: true,
+                        },
+                    },
+                    variants: true,
+                    images: true,
+                },
+            });
         });
     }
 

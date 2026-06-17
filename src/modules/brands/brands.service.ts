@@ -26,13 +26,20 @@ export class BrandsService {
         const { search, page = 1, limit = 20 } = query;
 
         const where = {
-        isActive: true,
-        ...(search && {
-            name: {
-            contains: search,
-            mode: 'insensitive' as const,
-            },
-        }),
+            ...(query.isActive !== undefined && {
+                isActive: query.isActive,
+            }),
+
+            ...(query.isVerified !== undefined && {
+                isVerified: query.isVerified,
+            }),
+
+            ...(search && {
+                name: {
+                    contains: search,
+                    mode: 'insensitive' as const,
+                },
+            }),
         };
 
         const [items, total] = await this.prisma.$transaction([
@@ -43,9 +50,9 @@ export class BrandsService {
                 },
                 include: {
                     _count: {
-                    select: {
-                        products: true,
-                    },
+                        select: {
+                            products: true,
+                        },
                     },
                 },
                 skip: (page - 1) * limit,
@@ -55,17 +62,24 @@ export class BrandsService {
         ]);
 
         return {
-        items,
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+            items,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
         };
     }
 
     async findOne(id: string) {
         const brand = await this.prisma.brand.findUnique({
-        where: { id },
+            where: { id },
+            include: {
+                _count: {
+                    select: {
+                        products: true,
+                    },
+                },
+            },
         });
 
         if (!brand || !brand.isActive) {
