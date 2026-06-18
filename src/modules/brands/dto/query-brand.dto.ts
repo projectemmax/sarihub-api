@@ -37,4 +37,9 @@ export class QueryBrandDto {
   @IsBoolean()
   isVerified?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true')
+  isDeleted?: boolean;
+
 }

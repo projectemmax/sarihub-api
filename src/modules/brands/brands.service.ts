@@ -26,6 +26,16 @@ export class BrandsService {
         const { search, page = 1, limit = 20 } = query;
 
         const where = {
+            ...(query.isDeleted
+                ? {
+                    deletedAt: {
+                    not: null,
+                    },
+                }
+                : {
+                    deletedAt: null,
+            }),
+
             ...(query.isActive !== undefined && {
                 isActive: query.isActive,
             }),
@@ -82,8 +92,8 @@ export class BrandsService {
             },
         });
 
-        if (!brand || !brand.isActive) {
-        throw new NotFoundException('Brand not found');
+        if (!brand || brand.deletedAt) {
+            throw new NotFoundException('Brand not found');
         }
 
         return brand;
@@ -134,47 +144,48 @@ export class BrandsService {
             where: { id },
         });
 
-        if (!brand || !brand.isActive) {
+        if (!brand || brand.deletedAt) {
             throw new NotFoundException('Brand not found');
         }
 
         let slug = brand.slug;
 
         if (dto.name && dto.name !== brand.name) {
-        const duplicate = await this.prisma.brand.findFirst({
-            where: {
-                name: {
-                    equals: dto.name,
-                    mode: 'insensitive',
+            const duplicate = await this.prisma.brand.findFirst({
+                where: {
+                    name: {
+                        equals: dto.name,
+                        mode: 'insensitive',
+                    },
+                    deletedAt: null,
+                    NOT: {
+                        id,
+                    },
                 },
-                NOT: {
-                    id,
+            });
+
+            if (duplicate) {
+                throw new ConflictException(
+                `Brand "${dto.name}" already exists`,
+                );
+            }
+
+            slug = this.generateSlug(dto.name);
+
+            const duplicateSlug = await this.prisma.brand.findFirst({
+                where: {
+                    slug,
+                    NOT: {
+                        id,
+                    },
                 },
-            },
-        });
+            });
 
-        if (duplicate) {
-            throw new ConflictException(
-            `Brand "${dto.name}" already exists`,
-            );
-        }
-
-        slug = this.generateSlug(dto.name);
-
-        const duplicateSlug = await this.prisma.brand.findFirst({
-            where: {
-                slug,
-                NOT: {
-                    id,
-                },
-            },
-        });
-
-        if (duplicateSlug) {
-            throw new ConflictException(
-            'Generated slug already exists',
-            );
-        }
+            if (duplicateSlug) {
+                throw new ConflictException(
+                'Generated slug already exists',
+                );
+            }
         }
 
         return this.prisma.brand.update({
@@ -189,23 +200,56 @@ export class BrandsService {
     async remove(id: string) {
         const brand = await this.prisma.brand.findUnique({
             where: { id },
+            include: {
+                _count: {
+                    select: {
+                        products: true,
+                    },
+                },
+            },
         });
 
-        if (!brand) {
+        if (!brand || brand.deletedAt) {
             throw new NotFoundException('Brand not found');
         }
 
-        if (!brand.isActive) {
+        if (brand._count.products > 0) {
             throw new BadRequestException(
-                'Brand already deleted',
+                'Cannot delete brand with existing products',
             );
         }
 
         return this.prisma.brand.update({
             where: { id },
             data: {
-                isActive: false,
+                deletedAt: new Date(),
             },
         });
     }
+
+    async restore(id: string) {
+        const brand = await this.prisma.brand.findUnique({
+            where: { id },
+        });
+
+        if (!brand) {
+            throw new NotFoundException('Brand not found');
+        }
+
+        if (!brand.deletedAt) {
+            throw new BadRequestException(
+            'Brand is not deleted',
+            );
+        }
+
+        return this.prisma.brand.update({
+            where: { id },
+            data: {
+            deletedAt: null,
+            isActive: true,
+            },
+        });
+    }
+
+    
 }
