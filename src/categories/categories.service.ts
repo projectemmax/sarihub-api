@@ -19,6 +19,7 @@ type CategoryRecord = {
     name: string;
     slug: string;
     parentId: string | null;
+    variantTemplate: Prisma.JsonValue | null;
     isActive: boolean;
     sortOrder: number;
 };
@@ -171,6 +172,8 @@ export class CategoriesService {
             throw new BadRequestException('Name is required');
         }
 
+        this.validateVariantTemplate(body.variantTemplate);
+
         const parentId = body.parentId || null;
 
         await this.assertParentExists(parentId);
@@ -181,6 +184,7 @@ export class CategoriesService {
                     name,
                     slug: await this.generateUniqueSlug(name),
                     parentId,
+                    variantTemplate: body.variantTemplate,
                     isActive: body.isActive ?? true,
                     sortOrder: body.sortOrder ?? 0,
                 },
@@ -209,6 +213,8 @@ export class CategoriesService {
         if (!existing) {
             throw new NotFoundException('Category not found');
         }
+
+        this.validateVariantTemplate(body.variantTemplate);
 
         if (
             body.parentId !== undefined &&
@@ -259,6 +265,9 @@ export class CategoriesService {
                                 }),
                                 ...(body.parentId !== undefined && {
                                     parentId: body.parentId || null,
+                                }),
+                                ...(body.variantTemplate !== undefined && {
+                                    variantTemplate: body.variantTemplate,
                                 }),
                                 ...(body.isActive !== undefined && {
                                     isActive: body.isActive,
@@ -348,6 +357,7 @@ export class CategoriesService {
             nodes.set(category.id, {
                 id: category.id,
                 name: category.name,
+                variantTemplate: category.variantTemplate,
                 children: [],
             });
         });
@@ -376,6 +386,7 @@ export class CategoriesService {
                 name: category.name,
                 slug: category.slug,
                 parentId: category.parentId,
+                variantTemplate: category.variantTemplate,
                 isActive: category.isActive,
                 sortOrder: category.sortOrder,
                 childCount: 0,
@@ -568,6 +579,23 @@ export class CategoriesService {
         return descendants;
     }
 
-    
+    private validateVariantTemplate(
+        variantTemplate?: { attributes: string[] },
+    ) {
+        if (!variantTemplate) {
+            return;
+        }
+
+        if (
+            !Array.isArray(variantTemplate.attributes) ||
+            variantTemplate.attributes.some(
+                attr => typeof attr !== 'string',
+            )
+        ) {
+            throw new BadRequestException(
+                'variantTemplate.attributes must be an array of strings',
+            );
+        }
+    }
 
 }

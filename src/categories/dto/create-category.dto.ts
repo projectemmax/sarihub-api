@@ -8,6 +8,8 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  IsArray,
+  ValidateNested
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -29,6 +31,16 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsUUID()
   parentId?: string | null;
+
+  @ApiPropertyOptional({
+    example: {
+      attributes: ['Color', 'Storage'],
+    },
+  })
+  @IsOptional()
+  variantTemplate?: {
+    attributes: string[];
+  };
 
   @ApiPropertyOptional({ example: true, default: true })
   @IsOptional()

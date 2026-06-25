@@ -1,6 +1,9 @@
+import { Prisma } from "@prisma/client";
+
 export interface CategoryTreeNode {
   id: string;
   name: string;
+  variantTemplate?: Prisma.JsonValue | null;
   children: CategoryTreeNode[];
 }
 
