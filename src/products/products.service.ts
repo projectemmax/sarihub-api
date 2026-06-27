@@ -803,23 +803,6 @@ export class ProductsService {
         ]);
     }
 
-    // ==========================
-    // ADMIN: UPLOAD IMAGE
-    // ==========================
-    async uploadProductImage(id: string, file: Express.Multer.File) {
-        if (!file) {
-            throw new BadRequestException('Image is required');
-        }
-
-        // Upload to Cloudinary
-        const uploaded = await this.cloudinaryService.uploadImage(file, { folder: 'products' });
-
-        return this.prisma.product.update({
-            where: { id },
-            data: { imageUrl: uploaded.url }, // ✅ SAVE FULL URL
-        });
-    }
-
     async hasPurchasedProduct(userId: string, slug: string) {
 
         const product = await this.prisma.product.findUnique({
@@ -843,6 +826,23 @@ export class ProductsService {
         return { data: !!purchase };
     }
 
+    // ==========================
+    // ADMIN: UPLOAD IMAGE
+    // ==========================
+    async uploadProductImage(id: string, file: Express.Multer.File) {
+        if (!file) {
+            throw new BadRequestException('Image is required');
+        }
+
+        // Upload to Cloudinary
+        const uploaded = await this.cloudinaryService.uploadImage(file, { folder: 'products' });
+
+        return this.prisma.product.update({
+            where: { id },
+            data: { imageUrl: uploaded.url }, // ✅ SAVE FULL URL
+        });
+    }
+
     async uploadVariantImage(
         productId: string,
         variantId: string,
@@ -857,8 +857,8 @@ export class ProductsService {
         });
 
         return {
-            public_id: uploaded.publicId,
-            url: uploaded.url
+            url: uploaded.url,
+            publicId: uploaded.publicId
         };
     }
 
