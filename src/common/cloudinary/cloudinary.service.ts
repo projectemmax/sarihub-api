@@ -67,4 +67,21 @@ export class CloudinaryService {
     async deleteImage(publicId: string): Promise<void> {
         await cloudinary.uploader.destroy(publicId);
     }
+
+    getImageUrl(
+        publicId: string,
+        transformation = this.defaultTransformation,
+    ): string {
+        return cloudinary.url(publicId, {
+            secure: true,
+            transformation,
+        });
+    }
+
+    private readonly defaultTransformation = [
+        { width: 1600, crop: 'limit' },
+        { quality: 'auto' },
+        { fetch_format: 'auto' },
+    ];
+
 }

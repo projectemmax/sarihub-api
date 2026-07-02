@@ -27,6 +27,7 @@ import { MediaModule } from './media/media.module';
 import { SellerDashboardModule } from './seller-dashboard/seller-dashboard.module';
 import { AiModule } from './modules/ai/ai.module';
 import { BrandsModule } from './modules/brands/brands.module';
+import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 
 
 @Module({
@@ -60,6 +61,7 @@ import { BrandsModule } from './modules/brands/brands.module';
     SellerDashboardModule,
     AiModule,
     BrandsModule,
+    CloudinaryModule
   ],
   controllers: [AppController, LocationController],
   providers: [AppService, LocationService],
