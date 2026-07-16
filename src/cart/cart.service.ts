@@ -96,10 +96,13 @@ export class CartService {
 
   async getDraftCart(userId: string) {
     const redis = this.redisService.getClient();
-    const cache = await redis.get(this.cartKey(userId));
 
-    if (cache) {
-      return JSON.parse(cache);
+    if (redis) {
+      const cache = await redis.get(this.cartKey(userId));
+
+      if (cache) {
+        return JSON.parse(cache);
+      }
     }
 
     const cart = await this.prisma.order.findFirst({
