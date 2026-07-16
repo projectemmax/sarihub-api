@@ -1,66 +1,69 @@
-# compiled output
-/dist
-/node_modules
-/build
+# ==========================================
+# Build
+# ==========================================
+dist/
+build/
 
+# ==========================================
+# Dependencies
+# ==========================================
+node_modules/
+
+# ==========================================
+# Environment
+# ==========================================
+.env
+.env.*
+!.env.example
+
+# ==========================================
 # Logs
-logs
+# ==========================================
+logs/
 *.log
-npm-debug.log*
-pnpm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
 
-# OS
-.DS_Store
+# ==========================================
+# Coverage
+# ==========================================
+coverage/
+.nyc_output/
 
-# Tests
-/coverage
-/.nyc_output
+# ==========================================
+# Runtime
+# ==========================================
+pids/
+*.pid
+*.seed
+*.pid.lock
 
-# IDEs and editors
-/.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
+# ==========================================
+# Temporary
+# ==========================================
+.temp/
+.tmp/
 
-# IDE - VSCode
+# ==========================================
+# Uploads
+# ==========================================
+uploads/
+
+# ==========================================
+# Database Backups
+# ==========================================
+backups/
+*.dump
+
+# ==========================================
+# IDE
+# ==========================================
+.idea/
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-.env.staging
-
-# temp directory
-.temp
-.tmp
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Diagnostic reports (https://nodejs.org/api/report.html)
-report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-.env.prod
-
-# Database dumps
-*.sql
-!prisma/migrations/20260510000000_add_order_courier_fields/migration.sql
-!prisma/migrations/20260511000000_add_variant_to_order_items/migration.sql
-!prisma/migrations/20260611000000_add_ai_product_descriptions/migration.sql
-*.dump
-backup/
+# ==========================================
+# OS
+# ==========================================
+.DS_Store
