@@ -17,10 +17,10 @@ async function bootstrap() {
       'http://localhost:4200',
 
         // Production
-        'https://ecommerce-frontend-clean.vercel.app',
+        'https://sarihub-web-staging.vercel.app',
 
         // Staging
-        'https://sarithub-web-staging.vercel.app',
+        'https://sarihub-web-staging.vercel.app',
       ],
       credentials: true,
   });  
