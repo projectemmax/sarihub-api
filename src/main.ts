@@ -14,10 +14,15 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-      'http://localhost:4200', // Angular local
-      'https://ecommerce-frontend-clean.vercel.app',
-    ],
-    credentials: true,
+      'http://localhost:4200',
+
+        // Production
+        'https://ecommerce-frontend-clean.vercel.app',
+
+        // Staging
+        'https://sarithub-web-staging.vercel.app',
+      ],
+      credentials: true,
   });  
 
   // Required for PayMongo webhook signature verification
