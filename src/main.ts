@@ -42,7 +42,7 @@ async function bootstrap() {
 
   // Swagger setup
   const config = new DocumentBuilder()
-    .setTitle('Ecommerce API')
+    .setTitle('SariHub API')
     .setDescription('Product management API')
     .setVersion('1.0')
     .addBearerAuth(
