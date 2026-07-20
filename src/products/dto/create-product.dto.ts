@@ -8,8 +8,11 @@ import {
   ValidateNested,
   IsInt,
   IsEnum,
+  MaxLength,
+  IsUUID,
+  ValidateIf,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // ==========================
@@ -100,6 +103,20 @@ export class CreateProductDto {
   description?: string;
 
   @ApiPropertyOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  shortDescription?: string;
+
+  @ApiPropertyOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(320)
+  seoDescription?: string;
+
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   sku?: string;
@@ -154,4 +171,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   isBestSeller?: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Brand ID. Set to null to remove brand association.',
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  brandId?: string | null;
+  
 }

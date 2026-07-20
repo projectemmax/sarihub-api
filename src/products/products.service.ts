@@ -22,15 +22,15 @@ export class ProductsService {
         const skip = (page - 1) * limit;
 
         const {
-        categoryId,
-        search,
-        sort,
-        status,
-        isFeatured,
-        isBestSeller,
-        inStock,
-        priceMin,
-        priceMax,
+            categoryId,
+            search,
+            sort,
+            status,
+            isFeatured,
+            isBestSeller,
+            inStock,
+            priceMin,
+            priceMax,
         } = query;
 
         const where: any = {
@@ -38,7 +38,6 @@ export class ProductsService {
             status: 'PUBLISHED',
             category: {
                 isActive: true,
-                deletedAt: null,
             },
         };
 
@@ -94,8 +93,24 @@ export class ProductsService {
                     category: { 
                         select: { 
                             id: true, 
-                            name: true 
+                            name: true,
+                            slug: true,
+                            parent: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    slug: true,
+                                },
+                            },
                         } 
+                    },
+                    brand: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                            logoUrl: true,
+                        },
                     },
                     variants: {
                         orderBy: {
@@ -137,7 +152,28 @@ export class ProductsService {
         const product = await this.prisma.product.findFirst({
             where: { slug, status: 'PUBLISHED', isActive: true },
             include: {
-                category: { select: { id: true, name: true } },
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        parent: {
+                            select: {
+                                id: true,
+                                name: true,
+                                slug: true,
+                            },
+                        },
+                    },
+                },
+                brand: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        logoUrl: true,
+                    },
+                },
                 reviews: { select: { rating: true } },
                 variants: {
                     orderBy: {
@@ -203,7 +239,10 @@ export class ProductsService {
     // ==========================
     // ADMIN: GET PRODUCTS
     // ==========================
-    async getAdminProducts(query: any) {
+    async getAdminProducts(
+        query: any,
+        user: any
+    ) {
         const page = Number(query.page) || 1;
         const limit = Number(query.limit) || 10;
         const skip = (page - 1) * limit;
@@ -218,6 +257,19 @@ export class ProductsService {
         } = query;
 
         const where: any = {};
+
+        if (
+            user.role === 'SELLER'
+        ) {
+
+            if (!user.storeId) {
+                throw new ConflictException(
+                    'Seller has no store'
+                );
+            }
+
+            where.storeId = user.storeId;
+        }
 
         const toBoolean = (v: any) =>
             v === undefined ? undefined : v === 'true' || v === true;
@@ -242,7 +294,27 @@ export class ProductsService {
                 skip,
                 take: limit,
                 include: {
-                    category: { select: { id: true, name: true } },
+                    category: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                            parent: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    slug: true,
+                                },
+                            },
+                        },
+                    },
+                    brand: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                        },
+                    },
                     variants: true,
                     images: true,
                 },
@@ -267,13 +339,19 @@ export class ProductsService {
     // ==========================
     // ADMIN: CREATE PRODUCT
     // ==========================
-    async createProduct(body: any) {
+    async createProduct(
+        body: any,
+        user: any
+    ) {
         const {
             sku,
             name,
             description,
+            shortDescription,
+            seoDescription,
             price,
             categoryId,
+            brandId,
             stock,
             status,
             variants = [],
@@ -303,66 +381,104 @@ export class ProductsService {
             }
         }
 
+        if (brandId !== undefined && brandId !== null) {
+            const brand = await this.prisma.brand.findFirst({
+                where: {
+                    id: brandId,
+                    isActive: true,
+                },
+            });
+
+            if (!brand) {
+                throw new BadRequestException(
+                    'Invalid brand selected',
+                );
+            }
+        }
+
         const slug = this.generateSlug(name);
 
         const baseSku = sku || `${slug}-default`;
 
+        let storeId = body.storeId;
+
+        if (
+            user.role === 'SELLER'
+        ) {
+
+            if (!user.storeId) {
+                throw new ConflictException(
+                    'Seller has no store'
+                );
+            }
+
+            storeId =
+                user.storeId;
+        }
+
         return this.prisma.product.create({
             data: {
-            name,
-            slug,
-            description,
-            categoryId,
-            isFeatured,
-            isBestSeller,
-            status: status ?? 'DRAFT',
-            isActive: true,
+                storeId,
+                name,
+                slug,
+                description,
+                shortDescription,
+                seoDescription,
+                categoryId,
+                brandId,
+                isFeatured,
+                isBestSeller,
+                status: status ?? 'DRAFT',
+                isActive: true,
 
-            variantOptions: variantOptions?.length ? variantOptions : null,
+                variantOptions: variantOptions?.length ? variantOptions : null,
 
-            
+                // ✅ FALLBACK (simple product)
+                sku: baseSku,
+                price: variants.length ? 0 : price,
+                stock: variants.length ? 0 : stock,
 
-            // ✅ FALLBACK (simple product)
-            sku: baseSku,
-            price: variants.length ? 0 : price,
-            stock: variants.length ? 0 : stock,
+                // ✅ VARIANTS (if exists)
+                variants: variants.length
+                    ? {
+                        create: variants.map((v: any) => ({
+                            sku: v.sku,
+                            price: Number(v.price),
+                            stock: Number(v.stock),
+                            attributes: v.attributes,
+                            image: v.image || null
+                        })),
+                    }
+                    : undefined,
 
-            // ✅ VARIANTS (if exists)
-            variants: variants.length
-                ? {
-                    create: variants.map((v: any) => ({
-                        sku: v.sku,
-                        price: Number(v.price),
-                        stock: Number(v.stock),
-                        attributes: v.attributes,
-                        image: v.image || null
-                    })),
-                }
-                : undefined,
-
-            // ✅ IMAGES
-            images: images.length
-                ? {
-                    create: images.map((img: any, index: number) => ({
-                    url: img.url,
-                    isPrimary: img.isPrimary,
-                    order: index,
-                    })),
-                }
-                : undefined,
-            },
-            include: {
-            variants: true,
-            images: true,
+                // ✅ IMAGES
+                images: images.length
+                    ? {
+                        create: images.map((img: any, index: number) => ({
+                        url: img.url,
+                        isPrimary: img.isPrimary,
+                        order: index,
+                        })),
+                    }
+                    : undefined,
+                },
+                include: {
+                variants: true,
+                images: true,
+                brand: true,
             },
         });
     }
 
-    async getProductById(id: string) {
+    async getProductById(
+        id: string,
+        user: any
+    ) {
         const product = await this.prisma.product.findUnique({
             where: { id },
             include: {
                 category: true,
+                brand: true,
                 variants: true,
                 images: true  
             }
@@ -372,13 +488,28 @@ export class ProductsService {
             throw new NotFoundException('Product not found');
         }
 
+        if (
+            user.role === 'SELLER'
+            &&
+            product.storeId !==
+                user.storeId
+        ) {
+            throw new NotFoundException(
+                'Product not found'
+            );
+        }
+
         return { data: product };
     }
 
     // ==========================
     // ADMIN: UPDATE PRODUCT
     // ==========================
-    async updateProduct(id: string, body: any) {
+    async updateProduct(
+        id: string, 
+        body: any,
+        user: any
+    ) {
         const existing = await this.prisma.product.findUnique({
             where: { id },
             include: {
@@ -391,10 +522,23 @@ export class ProductsService {
             throw new NotFoundException('Product not found');
         }
 
+        if (
+            user.role === 'SELLER'
+            &&
+            existing.storeId !== user.storeId
+        ) {
+            throw new BadRequestException(
+                'Access denied'
+            );
+        }
+
         const {
             name,
             description,
+            shortDescription,
+            seoDescription,
             categoryId,
+            brandId,
             price,
             stock,
             variants,
@@ -406,7 +550,7 @@ export class ProductsService {
             status,
         } = body;
 
-        // 🔥 FAST PATH — status only update (skip heavy transaction)
+        // FAST PATH — status only update (skip heavy transaction)
         if (
             status !== undefined &&
             variants === undefined &&
@@ -419,6 +563,21 @@ export class ProductsService {
             });
         }
 
+        if (brandId) {
+            const brand = await this.prisma.brand.findFirst({
+                where: {
+                    id: brandId,
+                    isActive: true,
+                },
+            });
+
+            if (!brand) {
+                throw new BadRequestException(
+                    'Invalid brand selected',
+                );
+            }
+        }
+
         // 🚀 FULL TRANSACTION
         return this.prisma.$transaction(async (tx) => {
 
@@ -429,7 +588,10 @@ export class ProductsService {
                 where: { id },
                 data: {
                     ...(name && { name }),
-                    ...(description && { description }),
+                    ...(brandId !== undefined && { brandId, }),
+                    ...(description !== undefined && { description: description || null }),
+                    ...(shortDescription !== undefined && { shortDescription: shortDescription || null }),
+                    ...(seoDescription !== undefined && { seoDescription: seoDescription || null }),
                     ...(categoryId && { categoryId }),
                     ...(isActive !== undefined && { isActive }),
                     ...(isFeatured !== undefined && { isFeatured }),
@@ -548,7 +710,22 @@ export class ProductsService {
                 }
             }
 
-            return product;
+            return tx.product.findUnique({
+                where: { id },
+                include: {
+                    category: true,
+                    brand: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                            logoUrl: true,
+                        },
+                    },
+                    variants: true,
+                    images: true,
+                },
+            });
         });
     }
 
@@ -626,23 +803,6 @@ export class ProductsService {
         ]);
     }
 
-    // ==========================
-    // ADMIN: UPLOAD IMAGE
-    // ==========================
-    async uploadProductImage(id: string, file: Express.Multer.File) {
-        if (!file) {
-            throw new BadRequestException('Image is required');
-        }
-
-        // Upload to Cloudinary
-        const uploaded = await this.cloudinaryService.uploadImage(file, { folder: 'products' });
-
-        return this.prisma.product.update({
-            where: { id },
-            data: { imageUrl: uploaded.url }, // ✅ SAVE FULL URL
-        });
-    }
-
     async hasPurchasedProduct(userId: string, slug: string) {
 
         const product = await this.prisma.product.findUnique({
@@ -666,6 +826,23 @@ export class ProductsService {
         return { data: !!purchase };
     }
 
+    // ==========================
+    // ADMIN: UPLOAD IMAGE
+    // ==========================
+    async uploadProductImage(id: string, file: Express.Multer.File) {
+        if (!file) {
+            throw new BadRequestException('Image is required');
+        }
+
+        // Upload to Cloudinary
+        const uploaded = await this.cloudinaryService.uploadImage(file, { folder: 'products' });
+
+        return this.prisma.product.update({
+            where: { id },
+            data: { imageUrl: uploaded.url }, // ✅ SAVE FULL URL
+        });
+    }
+
     async uploadVariantImage(
         productId: string,
         variantId: string,
@@ -680,9 +857,10 @@ export class ProductsService {
         });
 
         return {
-            public_id: uploaded.publicId,
-            url: uploaded.url
+            url: uploaded.url,
+            publicId: uploaded.publicId
         };
     }
+
 
 }

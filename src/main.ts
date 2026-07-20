@@ -14,10 +14,15 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-      'http://localhost:4200', // Angular local
-      'https://ecommerce-frontend-clean.vercel.app',
-    ],
-    credentials: true,
+      'http://localhost:4200',
+
+        // Production
+        'https://sarihub-web.vercel.app',
+
+        // Staging
+        'https://sarihub-web-staging.vercel.app',
+      ],
+      credentials: true,
   });  
 
   // Required for PayMongo webhook signature verification
@@ -37,7 +42,7 @@ async function bootstrap() {
 
   // Swagger setup
   const config = new DocumentBuilder()
-    .setTitle('Ecommerce API')
+    .setTitle('SariHub API')
     .setDescription('Product management API')
     .setVersion('1.0')
     .addBearerAuth(
@@ -52,7 +57,7 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
 
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('api/docs', app, document);
 
   // Global validation
   app.useGlobalPipes(

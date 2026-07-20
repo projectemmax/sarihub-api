@@ -8,31 +8,41 @@ datasource db {
 }
 
 model Product {
-  id             String           @id @default(uuid())
-  name           String
-  description    String?
-  price          Decimal          @db.Decimal(10, 2)
-  isActive       Boolean          @default(true)
-  categoryId     String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  imageUrl       String?
-  stock          Int              @default(0)
-  sku            String           @unique
-  isBestSeller   Boolean          @default(false)
-  isFeatured     Boolean          @default(false)
-  slug           String           @unique
-  rating         Float            @default(0)
-  reviewCount    Int              @default(0)
-  variantOptions Json?
-  status         ProductStatus    @default(DRAFT)
-  orderItems     OrderItem[]
-  category       Category         @relation(fields: [categoryId], references: [id])
-  images         ProductImage[]
-  variants       ProductVariant[]
-  reviews        Review[]
+  id               String        @id @default(uuid())
+  name             String
+  description      String?
+  shortDescription String?
+  seoDescription   String?
+  price            Decimal       @db.Decimal(10, 2)
+  isActive         Boolean       @default(true)
+  categoryId       String
+  brandId          String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  imageUrl         String?
+  stock            Int           @default(0)
+  sku              String        @unique
+  isBestSeller     Boolean       @default(false)
+  isFeatured       Boolean       @default(false)
+  slug             String        @unique
+  rating           Float         @default(0)
+  reviewCount      Int           @default(0)
+  variantOptions   Json?
+  status           ProductStatus @default(DRAFT)
+  storeId          String?
+
+  orderItems OrderItem[]
+
+  category Category @relation(fields: [categoryId], references: [id])
+  brand    Brand?   @relation(fields: [brandId], references: [id])
+  store    Store?   @relation(fields: [storeId], references: [id])
+
+  images   ProductImage[]
+  variants ProductVariant[]
+  reviews  Review[]
 
   @@index([categoryId])
+  @@index([brandId])
 }
 
 model ProductVariant {
@@ -45,8 +55,8 @@ model ProductVariant {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   image      String?
-  product    Product     @relation(fields: [productId], references: [id])
   orderItems OrderItem[]
+  product    Product     @relation(fields: [productId], references: [id])
 
   @@index([productId])
 }
@@ -64,14 +74,21 @@ model ProductImage {
 }
 
 model Category {
-  id              String    @id @default(uuid())
-  name            String    @unique
-  isActive        Boolean   @default(true)
-  deletedAt       DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id        String     @id @default(uuid())
+  name      String
+  slug      String     @unique
+  parentId  String?
   variantTemplate Json?
-  products        Product[]
+  isActive  Boolean    @default(true)
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Category[] @relation("CategoryHierarchy")
+  products  Product[]
+
+  @@index([parentId])
+  @@index([isActive, sortOrder])
 }
 
 model User {
@@ -82,11 +99,13 @@ model User {
   isActive             Boolean              @default(true)
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
+  storeId              String?
   customer             CustomerProfile?
   orders               Order[]
   changedOrderStatuses OrderStatusHistory[] @relation("OrderStatusChangedBy")
   Review               Review[]
   reviewVotes          ReviewVote[]
+  store                Store?               @relation(fields: [storeId], references: [id])
 }
 
 model CustomerProfile {
@@ -189,16 +208,18 @@ model Order {
   returnedAt         DateTime?
   shippedAt          DateTime?
   trackingNumber     String?
-  trackingUrl        String?
-  courierName        String?
-  courierCode        String?
-  shippingMethod     String?
-  shippingStatus     ShippingStatus       @default(PENDING)
   shippingCity       String?
   shippingProvince   String?
   messageForSeller   String?
   completedAt        DateTime?
   orderNumber        String               @unique
+  courierCode        String?
+  courierName        String?
+  shippingMethod     String?
+  shippingStatus     ShippingStatus       @default(PENDING)
+  trackingUrl        String?
+  storeId            String?
+  store              Store?               @relation(fields: [storeId], references: [id])
   user               User?                @relation(fields: [userId], references: [id])
   items              OrderItem[]
   statusHistory      OrderStatusHistory[]
@@ -213,24 +234,27 @@ model OrderItem {
   id                String          @id @default(uuid())
   orderId           String
   productId         String
-  variantId         String?
   productName       String
-  variantName       String?
-  variantSku        String?
-  variantAttributes Json?
   priceSnapshot     Decimal         @db.Decimal(10, 2)
   quantity          Int
   subtotal          Decimal         @db.Decimal(10, 2)
   productImage      String?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @default(now()) @updatedAt
+  variantAttributes Json?
+  variantId         String?
+  variantName       String?
+  variantSku        String?
+  storeId           String?
   order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product           Product         @relation(fields: [productId], references: [id])
+  store             Store?          @relation(fields: [storeId], references: [id])
   variant           ProductVariant? @relation(fields: [variantId], references: [id])
   review            Review?
 
   @@index([orderId])
   @@index([productId])
+  @@index([storeId])
   @@index([variantId])
 }
 
@@ -302,10 +326,31 @@ model PaymentTransactionLog {
   @@index([paymentId])
 }
 
-model playing_with_neon {
-  id    Int    @id @default(autoincrement())
-  name  String
-  value Float? @db.Real
+model Media {
+  id        String   @id @default(uuid())
+  url       String
+  publicId  String
+  filename  String
+  size      Int?
+  folder    String?
+  usage     String?
+  createdAt DateTime @default(now())
+
+  @@index([folder])
+  @@index([createdAt])
+}
+
+model Store {
+  id         String      @id @default(uuid())
+  name       String
+  slug       String      @unique
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  orders     Order[]
+  orderItems OrderItem[]
+  products   Product[]
+  users      User[]
 }
 
 enum ProductStatus {
@@ -316,6 +361,7 @@ enum ProductStatus {
 
 enum UserRole {
   ADMIN
+  SELLER
   CUSTOMER
 }
 
@@ -368,16 +414,22 @@ enum PaymentMethod {
   CARD
 }
 
-model Media {
-  id        String   @id @default(uuid())
-  url       String
-  publicId  String
-  filename  String
-  size      Int?
-  folder    String?
-  usage     String?
-  createdAt DateTime @default(now())
+model Brand {
+  id String @id @default(uuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  logoUrl     String?
+  isVerified  Boolean @default(false)
+  isActive    Boolean @default(true)
 
-  @@index([folder])
-  @@index([createdAt])
+  products Product[]
+
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([slug])
 }

@@ -106,6 +106,7 @@ export class CustomerProfileService {
                 id: true,
                 email: true,
                 role: true,
+                storeId: true,
                 customer: {
                     select: {
                         firstName: true,
@@ -121,6 +122,7 @@ export class CustomerProfileService {
             id: user?.id,
             email: user?.email,
             role: user?.role,
+            storeId: user?.storeId ?? null,
             firstName: user?.customer?.firstName ?? user?.email?.split('@')[0],
             lastName: user?.customer?.lastName ?? '',
             mobileNo: user?.customer?.mobileNo ?? '',

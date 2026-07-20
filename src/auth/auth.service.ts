@@ -91,7 +91,13 @@ export class AuthService {
             sub: user.id,
             role: user.role,
             email: user.email,
+            storeId: user.storeId ?? null,
         };
+
+        console.log(
+        'LOGIN PAYLOAD =>',
+        payload
+        );
 
         const accessToken = await this.jwtService.signAsync(payload);
 
@@ -101,6 +107,7 @@ export class AuthService {
                 id: user.id,
                 email: user.email,
                 role: user.role,
+                storeId: user.storeId ?? null,
                 firstName: user.customer?.firstName ?? null,
                 lastName: user.customer?.lastName ?? null,
             },

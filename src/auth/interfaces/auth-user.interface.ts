@@ -1,5 +1,11 @@
 export interface AuthUser {
   id: string;
   email: string;
-  role: 'ADMIN' | 'CUSTOMER';
+
+  role:
+    | 'ADMIN'
+    | 'SELLER'
+    | 'CUSTOMER';
+
+  storeId?: string | null;
 }

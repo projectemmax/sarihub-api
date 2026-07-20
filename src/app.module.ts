@@ -24,6 +24,10 @@ import { SiteConfigModule } from './site-config/site-config.module';
 import { PaymentModule } from './payment/payment.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MediaModule } from './media/media.module';
+import { SellerDashboardModule } from './seller-dashboard/seller-dashboard.module';
+import { AiModule } from './modules/ai/ai.module';
+import { BrandsModule } from './modules/brands/brands.module';
+import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 
 
 @Module({
@@ -54,6 +58,10 @@ import { MediaModule } from './media/media.module';
     PaymentModule,
     ScheduleModule.forRoot(),
     MediaModule,
+    SellerDashboardModule,
+    AiModule,
+    BrandsModule,
+    CloudinaryModule
   ],
   controllers: [AppController, LocationController],
   providers: [AppService, LocationService],

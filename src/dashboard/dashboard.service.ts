@@ -4,140 +4,438 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus } from '@prisma/client';
 import { format, subDays, subMonths, subYears } from 'date-fns';
+import { DashboardAggregationService } from './services/dashboard-aggregation.service';
+
 
 
 @Injectable()
 export class DashboardService {
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private aggregate: DashboardAggregationService
+    ) {}
 
-    async getStats() {
-        const totalOrders = await this.prisma.order.count();
-        const totalCustomers = await this.prisma.user.count({
-            where: { role: 'CUSTOMER' }
-        });
+    async getStats(
+        storeId?: string
+    ) {
 
-        const pendingReviews = await this.prisma.review.count({
-            where: { status: 'PENDING' }
-        });
+        if (storeId) {
 
-        const sales = await this.prisma.order.aggregate({
-            _sum: { totalAmount: true }
-        });
+            return this.aggregate
+                .getMetrics(
+                    storeId
+                );
+        }
+
+        const totalOrders =
+            await this.prisma.order.count();
+
+        const totalCustomers =
+            await this.prisma.user.count({
+
+                where: {
+                    role:
+                    'CUSTOMER'
+                }
+            });
+
+        const pendingReviews =
+            await this.prisma.review.count({
+
+                where: {
+                    status:
+                    'PENDING'
+                }
+            });
+
+        const sales =
+            await this.prisma.order.aggregate({
+
+                _sum: {
+                    totalAmount:
+                    true
+                }
+            });
 
         return {
-            orders: totalOrders,
-            customers: totalCustomers,
-            sales: sales._sum.totalAmount || 0,
+
+            orders:
+                totalOrders,
+
+            customers:
+                totalCustomers,
+
+            sales:
+                sales._sum
+                    .totalAmount || 0,
+
             pendingReviews
         };
     }
 
-    async getAnalytics(range: string) {
-        const { startDate, prevStartDate } = this.getDateRange(range);
+    async getAnalytics(
+    range: string,
+) {
 
-        const validStatuses: OrderStatus[] = [
-            OrderStatus.PROCESSING,
-            OrderStatus.SHIPPED,
-            OrderStatus.DELIVERED,
-        ];
+    const raw =
+        await this.aggregate
+            .getAnalytics(
 
-        const sales = await this.prisma.order.aggregate({
-            _sum: { totalAmount: true },
-            where: {
-                status: { in: validStatuses },
-                placedAt: { gte: startDate, not: null }
+                range as
+
+                '1D'
+                | '7D'
+                | '1M'
+                | '1Y',
+            );
+
+    const grouped =
+    new Map<
+        string,
+        {
+            revenue: number;
+            orders: number;
+            orderIds: Set<string>;
+        }
+    >();
+
+    raw.forEach(
+        (
+            row,
+        ) => {
+
+            const date =
+                format(
+                    row.createdAt,
+
+                    'yyyy-MM-dd',
+                );
+
+            if (
+                !grouped.has(
+                    date,
+                )
+            ) {
+
+                grouped.set(
+                    date,
+                    {
+                        revenue: 0,
+                        orders: 0,
+                        orderIds: new Set(),
+                    },
+                );
             }
-        });
 
-        // CURRENT PERIOD
-        const orders = await this.prisma.order.findMany({
-            where: {
-                status: { in: validStatuses },
-                placedAt: { gte: startDate, not: null }
+            const item =
+                grouped.get(
+                    date,
+                )!;
+
+            item.revenue +=
+                Number(
+                    row.subtotal ??
+                    0,
+                );
+
+            item.orderIds
+            .add(
+                row.orderId,
+            );
+
+            item.orders =
+                item.orderIds
+                    .size;
+        },
+    );
+
+    const timeline =
+        Array.from(
+
+            grouped.entries(),
+
+        ).map(
+
+            (
+                [
+                    date,
+
+                    values,
+                ],
+            ) => ({
+
+                date,
+
+                revenue:
+                    values.revenue,
+
+                orders:
+                    values.orders,
+            }),
+        );
+
+    const totalRevenue =
+        timeline.reduce(
+
+            (
+                sum,
+
+                item,
+            ) =>
+
+                sum +
+                item.revenue,
+
+            0,
+        );
+
+    const totalOrders =
+    timeline.reduce(
+
+        (
+            sum,
+
+            item,
+        ) =>
+
+            sum +
+            item.orders,
+
+        0,
+    );
+
+const {
+    prevStartDate,
+    startDate,
+} =
+this.getDateRange(
+    range,
+);
+
+const previous =
+    await this.prisma.order.aggregate({
+
+        _sum: {
+
+            totalAmount:
+                true,
+        },
+
+        where: {
+
+            status: {
+
+                in: [
+
+                    OrderStatus.PROCESSING,
+
+                    OrderStatus.SHIPPED,
+
+                    OrderStatus.DELIVERED,
+                ],
             },
-            select: {
-                placedAt: true,
-                totalAmount: true
-            }
-        });
 
-        // PREVIOUS PERIOD
-        const prevOrders = await this.prisma.order.aggregate({
-            _sum: { totalAmount: true },
-            where: {
-                status: { in: validStatuses },
-                placedAt: {
-                    not: null,
-                    gte: prevStartDate,
-                    lt: startDate
-                }
-            }
-        });
+            placedAt: {
 
-        const timeline = this.buildTimeline(orders, range);
+                gte:
+                    prevStartDate,
 
-        const totalRevenue = timeline.reduce((sum, d) => sum + d.revenue, 0);
-        const totalOrders = timeline.reduce((sum, d) => sum + d.orders, 0);
+                lt:
+                    startDate,
 
-        const prevRevenue = Number(prevOrders._sum?.totalAmount || 0);
+                not:
+                    null,
+            },
+        },
+    });
 
-        const growth =
-            prevRevenue === 0
-                ? (totalRevenue > 0 ? 100 : 0)
-                : ((totalRevenue - prevRevenue) / prevRevenue) * 100;
+const previousRevenue =
+    Number(
+        previous
+            ._sum
+            ?.totalAmount
+        ??
+        0,
+    );
 
-        return {
-            timeline,
-            totalRevenue,
-            totalOrders,
-            growth: Number(growth.toFixed(2))
-        };
-    }
+const growth =
 
-    async getTopProducts() {
+    previousRevenue === 0
+
+        ? (
+            totalRevenue > 0
+                ? 100
+                : 0
+        )
+
+        : Number(
+
+            (
+                (
+                    (
+                        totalRevenue
+                        -
+                        previousRevenue
+                    )
+                    /
+                    previousRevenue
+                )
+                *
+                100
+            ).toFixed(
+                2,
+            ),
+        );
+
+return {
+
+    timeline,
+
+    totalRevenue,
+
+    totalOrders,
+
+    growth,
+};
+}
+
+    async getTopProducts(storeId?: string) {
         const products = await this.prisma.orderItem.groupBy({
             by: ['productId'],
-            _sum: { quantity: true },
+            _sum: {
+                quantity: true,
+            },
             orderBy: {
-                _sum: { quantity: 'desc' }
+                _sum: {
+                    quantity: 'desc',
+                },
             },
             take: 5,
             where: {
+                ...(storeId && {
+                    product: {
+                        storeId,
+                    },
+                }),
                 order: {
                     status: {
                         in: [
-                        OrderStatus.PROCESSING,
-                        OrderStatus.SHIPPED,
-                        OrderStatus.DELIVERED
-                        ]
+                            OrderStatus.PROCESSING,
+                            OrderStatus.SHIPPED,
+                            OrderStatus.DELIVERED,
+                        ],
                     },
                     placedAt: {
-                        not: null
-                    }
-                }
-            }
-        });
-
-        const productIds = products.map(p => p.productId);
-
-        const productDetails = await this.prisma.product.findMany({
-            where: {
-                id: { in: productIds },
+                        not: null,
+                    },
+                },
             },
-            select: {
-                id: true,
-                name: true
-            }
         });
 
-        const productMap = new Map(productDetails.map(p => [p.id, p]));
+        if (!products.length) {
+            return [];
+        }
 
-        return products.map(p => ({
-        productId: p.productId,
-        name: productMap.get(p.productId)?.name,
-        sold: p._sum.quantity
-        }));
+        const productIds = products.map(
+            p => p.productId,
+        );
+
+        const productDetails =
+            await this.prisma.product.findMany({
+                where: {
+                    id: {
+                        in: productIds,
+                    },
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    images: {
+                        select: {
+                            url: true,
+                        },
+                        take: 1,
+                    },
+                },
+            });
+
+        const productMap = new Map(
+            productDetails.map(
+                p => [p.id, p],
+            ),
+        );
+
+        const totalRevenue =
+            products.reduce(
+                (sum, p) => {
+
+                    const product =
+                        productMap.get(
+                            p.productId,
+                        );
+
+                    return (
+                        sum +
+                        (
+                            (
+                                p._sum.quantity ??
+                                0
+                            ) *
+                            Number(
+                                product?.price ??
+                                0,
+                            )
+                        )
+                    );
+                },
+                0,
+            );
+
+        return products.map(
+            p => {
+
+                const product =
+                    productMap.get(
+                        p.productId,
+                    );
+
+                const sold =
+                    p._sum.quantity ??
+                    0;
+
+                const revenue =
+                    sold *
+                    Number(
+                        product?.price ??
+                        0,
+                    );
+
+                return {
+                    id: p.productId,
+                    name:
+                        product?.name ??
+                        'Unknown',
+                    sold,
+                    revenue,
+                    image:
+                        product?.images?.[0]?.url ??
+                        undefined,
+                    percentage:
+                        totalRevenue > 0
+                            ? Number(
+                                (
+                                    (
+                                        revenue /
+                                        totalRevenue
+                                    ) * 100
+                                ).toFixed(1),
+                            )
+                            : 0,
+                };
+            },
+        );
     }
 
     async getLatestCustomers() {
@@ -196,32 +494,6 @@ export class DashboardService {
         });
     }
 
-    private buildTimeline(orders: any[], range: string) {
-        const map = new Map<string, { revenue: number; orders: number }>();
-
-        for (const order of orders) {
-            if (!order.placedAt) continue;
-
-            const key = format(order.placedAt, 'yyyy-MM-dd');
-
-            if (!map.has(key)) {
-            map.set(key, { revenue: 0, orders: 0 });
-            }
-
-            const entry = map.get(key)!;
-            entry.revenue += Number(order.totalAmount ?? 0);
-            entry.orders += 1;
-        }
-
-        const dates = this.generateDateSeries(range);
-
-        return dates.map(date => ({
-            date,
-            revenue: map.get(date)?.revenue || 0,
-            orders: map.get(date)?.orders || 0
-        }));
-    }
-
     private getDateRange(range: string) {
         const now = new Date();
 
@@ -254,54 +526,5 @@ export class DashboardService {
         }
     }
 
-    private generateDateSeries(range: string): string[] {
-        const dates: string[] = [];
-        const now = new Date();
-
-        let days = 7;
-
-        switch (range) {
-            case '1D':
-            days = 1;
-            break;
-            case '7D':
-            days = 7;
-            break;
-            case '1M':
-            days = 30;
-            break;
-            case '1Y':
-            days = 365;
-            break;
-        }
-
-        for (let i = days - 1; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(now.getDate() - i);
-            dates.push(format(d, 'yyyy-MM-dd'));
-        }
-
-        return dates;
-    }
-
-    private normalizeTimeline(data: any[], range: string) {
-        const map = new Map();
-
-        data.forEach(d => {
-            const key = format(d.createdAt, 'yyyy-MM-dd');
-            map.set(key, {
-            revenue: d._sum.totalAmount || 0,
-            orders: d._count.id || 0
-            });
-        });
-
-        const days = this.generateDateSeries(range);
-
-        return days.map(date => ({
-            date,
-            revenue: map.get(date)?.revenue || 0,
-            orders: map.get(date)?.orders || 0
-        }));
-    }
 
 }

@@ -14,7 +14,12 @@ import { CategoriesService } from './categories.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Admin Categories')
+@ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 @Controller('admin/categories')
@@ -22,19 +27,26 @@ export class AdminCategoriesController {
     constructor(private readonly categoriesService: CategoriesService) {}
 
     @Get()
+    @Roles(
+        'ADMIN',
+        'SELLER'
+    )
     getCategories() {
         return this.categoriesService.getAdminCategories();
     }
 
+    @Get('tree')
+    @Roles(
+        'ADMIN',
+        'SELLER'
+    )
+    getCategoryTree() {
+        return this.categoriesService.getAdminCategoryTree();
+    }
+
     @Post()
     createCategory(
-        @Body() body: {
-            name: string; 
-            isActive?: boolean;
-            variantTemplate?: {
-                attributes: string[];
-            }; 
-        }
+        @Body() body: CreateCategoryDto
     ) {
         return this.categoriesService.createCategory(body);
     }
@@ -42,13 +54,7 @@ export class AdminCategoriesController {
     @Patch(':id')
     updateCategory(
         @Param('id') id: string,
-        @Body() body: { 
-            name?: string; 
-            isActive?: boolean;
-            variantTemplate?: {
-                attributes: string[];
-            };
-        },
+        @Body() body: UpdateCategoryDto,
     ) {
         return this.categoriesService.updateCategory(id, body);
     }
@@ -56,6 +62,6 @@ export class AdminCategoriesController {
     @Delete(':id')
     @HttpCode(204)
     async deleteCategory(@Param('id') id: string) {
-        await this.categoriesService.softDeleteCategory(id);
+        await this.categoriesService.deleteCategory(id);
     }
 }

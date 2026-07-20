@@ -29,9 +29,10 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
+@Roles('ADMIN', 'SELLER')
 @ApiBearerAuth()
 @Controller('admin/products')
 export class AdminProductsController {
@@ -42,8 +43,9 @@ export class AdminProductsController {
 
     // GET /api/admin/products
     @Get()
-    getProducts(@Query() query: GetProductsDto) {
-        return this.productsService.getAdminProducts(query);
+    getProducts(@Query() query: GetProductsDto, @CurrentUser() user: any) {
+        console.log(user);
+        return this.productsService.getAdminProducts(query, user);
     }
 
     @Patch('bulk-status')
@@ -53,23 +55,24 @@ export class AdminProductsController {
 
     // GET /api/admin/products/:id
     @Get(':id')
-    getProductById(@Param('id') id: string) {
-        return this.productsService.getProductById(id);
+    getProductById(@Param('id') id: string, @CurrentUser() user: any) {
+        return this.productsService.getProductById(id, user);
     }
 
     // POST /api/admin/products
     @Post()
-    createProduct(@Body() body: CreateProductDto) {
-        return this.productsService.createProduct(body);
+    createProduct(@Body() body: CreateProductDto, @CurrentUser() user: any) {
+        return this.productsService.createProduct(body, user);
     }
 
     // PATCH /api/admin/products/:id
     @Put(':id')
     updateProduct(
         @Param('id') id: string,
-        @Body() body: UpdateProductDto
+        @Body() body: UpdateProductDto,
+        @CurrentUser() user: any
     ) {
-        return this.productsService.updateProduct(id, body);
+        return this.productsService.updateProduct(id, body, user);
     }
 
     // DELETE /api/admin/products/:id

@@ -96,10 +96,13 @@ export class CartService {
 
   async getDraftCart(userId: string) {
     const redis = this.redisService.getClient();
-    const cache = await redis.get(this.cartKey(userId));
 
-    if (cache) {
-      return JSON.parse(cache);
+    if (redis) {
+      const cache = await redis.get(this.cartKey(userId));
+
+      if (cache) {
+        return JSON.parse(cache);
+      }
     }
 
     const cart = await this.prisma.order.findFirst({
@@ -178,11 +181,19 @@ export class CartService {
 
       const product = await tx.product.findUnique({
         where: { id: productId },
-        include:{
-            images: {
-                orderBy:{ order: 'asc' },
-                take: 1,
-            },
+        select: {
+          id: true,
+          name: true,
+          stock: true,
+          price: true,
+          imageUrl: true,
+
+          storeId: true,
+
+          images: {
+            orderBy: { order: 'asc' },
+            take: 1,
+          },
             variants: true,
         }
       });
@@ -237,22 +248,39 @@ export class CartService {
           },
         });
       } else {
-        await tx.orderItem.create({
+        const created = await tx.orderItem.create({
           data: {
             orderId: cart.id,
+
+            storeId: product.storeId,
+
             productId,
             variantId: variant?.id,
+
             productName: product.name,
-            variantName: this.getVariantLabel(variant?.attributes),
+
+            variantName: this.getVariantLabel(
+              variant?.attributes,
+            ),
+
             variantSku: variant?.sku,
+
             ...(variant?.attributes && {
               variantAttributes: variant.attributes as any,
             }),
+
             productImage,
+
             priceSnapshot: price,
             quantity,
+
             subtotal: quantity * Number(price),
           },
+        });
+
+        console.log({
+          orderItem: created.id,
+          storeId: created.storeId,
         });
       }
 

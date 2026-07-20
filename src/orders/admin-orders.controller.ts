@@ -26,8 +26,22 @@ export class AdminOrdersController {
     constructor(private readonly ordersService: OrdersService) {}
 
     @Get()
-    async getAdminOrders(@Query() query: AdminOrdersQueryDto) {
-        return this.ordersService.getAdminOrders(query);
+    async getAdminOrders(
+
+        @Query()
+        query: AdminOrdersQueryDto,
+
+        @Req()
+        req,
+
+    ) {
+
+        return this.ordersService
+            .getAdminOrders(
+                query,
+                req.user
+            );
+
     }
 
     @Get(':id')

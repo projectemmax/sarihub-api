@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import {
   Controller,
   Post,
@@ -29,6 +30,18 @@ import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 @Controller('reviews')
 export class StorefrontReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
+
+  // ================= SELLER ================
+  
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SELLER')
+  @Get('seller')
+  @ApiOperation({ summary: 'Get seller product reviews' })
+  getSellerReviews(
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.reviewsService.getSellerReviews(user.id);
+  }
 
   // ================= USER =================
 
@@ -83,5 +96,8 @@ export class StorefrontReviewsController {
   ) {
     return this.reviewsService.uploadImages(reviewId, files, user.id);
   }
+
+
+  
 
 }
