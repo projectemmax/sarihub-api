@@ -17,7 +17,7 @@ async function bootstrap() {
       'http://localhost:4200',
 
         // Production
-        'https://sarihub-web-staging.vercel.app',
+        'https://sarihub-web.vercel.app',
 
         // Staging
         'https://sarihub-web-staging.vercel.app',
