@@ -20,6 +20,13 @@ export class PayMongoProvider {
         const successUrl = this.configService.get<string>('FRONTEND_SUCCESS_URL');
         const failedUrl = this.configService.get<string>('FRONTEND_FAILED_URL');
 
+        console.log('========================');
+        console.log('NODE_ENV:', process.env.NODE_ENV);
+        console.log('process.env.FRONTEND_SUCCESS_URL:', process.env.FRONTEND_SUCCESS_URL);
+        console.log('config FRONTEND_SUCCESS_URL:', successUrl);
+        console.log('config FRONTEND_FAILED_URL:', failedUrl);
+        console.log('========================');
+
         const paymentMethods = {
             gcash: ['gcash'],
             maya: ['paymaya'],
