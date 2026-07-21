@@ -6,7 +6,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
@@ -69,6 +69,28 @@ async function bootstrap() {
   );
 
   app.useGlobalInterceptors(new ResponseInterceptor());
+
+  const configService = app.get(ConfigService);
+
+console.log('========================');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log(
+  'process.env.FRONTEND_SUCCESS_URL:',
+  process.env.FRONTEND_SUCCESS_URL,
+);
+console.log(
+  'config FRONTEND_SUCCESS_URL:',
+  configService.get('FRONTEND_SUCCESS_URL'),
+);
+console.log(
+  'config FRONTEND_FAILED_URL:',
+  configService.get('FRONTEND_FAILED_URL'),
+);
+console.log(
+  'PAYMONGO_SECRET_KEY:',
+  configService.get<string>('PAYMONGO_SECRET_KEY')?.substring(0, 12) + '...',
+);
+console.log('========================');
 
   await app.listen(3001);
 }
