@@ -26,8 +26,6 @@ export class PaymentService {
             where: { id: dto.orderId },
         });
 
-        console.log('ORDER ID:', dto.orderId);
-
         if (!order) throw new BadRequestException('Order not found');
 
         if (userId && order.userId !== userId) {
@@ -52,9 +50,6 @@ export class PaymentService {
         });
 
         const attemptNo = count + 1;
-
-        console.log('COUNT:', count);
-        console.log('FORCE NEW:', forceNew);
 
         const gateway = await this.createGatewaySession(order, dto.paymentMethod);
 
@@ -143,14 +138,10 @@ export class PaymentService {
 
     async markPaymentPaid(checkoutSessionId: string, payload: any) {
 
-        console.log('Looking for payment with checkoutSessionId:', checkoutSessionId);
-
         const payment = await this.prisma.paymentTransaction.findFirst({
             where: { checkoutSessionId },
             include: { order: true },
         });
-
-        console.log('Found payment:', payment);
 
         if (!payment) return;
 
