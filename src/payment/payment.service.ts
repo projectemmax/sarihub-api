@@ -26,8 +26,6 @@ export class PaymentService {
             where: { id: dto.orderId },
         });
 
-        console.log('ORDER ID:', dto.orderId);
-
         if (!order) throw new BadRequestException('Order not found');
 
         if (userId && order.userId !== userId) {
@@ -53,29 +51,7 @@ export class PaymentService {
 
         const attemptNo = count + 1;
 
-        console.log('COUNT:', count);
-        console.log('FORCE NEW:', forceNew);
-
         const gateway = await this.createGatewaySession(order, dto.paymentMethod);
-
-        console.log('========================');
-        console.log('Gateway Response');
-        console.log('Provider:', gateway.provider);
-        console.log('Checkout Session:', gateway.checkoutSessionId);
-        console.log('Redirect URL:', gateway.redirectUrl);
-
-        if (gateway.rawResponse?.data?.attributes) {
-        console.log(
-            'PayMongo Success URL:',
-            gateway.rawResponse.data.attributes.success_url,
-        );
-        console.log(
-            'PayMongo Cancel URL:',
-            gateway.rawResponse.data.attributes.cancel_url,
-        );
-        }
-
-        console.log('========================');
 
         const data = {
             orderId: order.id,
@@ -143,14 +119,10 @@ export class PaymentService {
 
     async markPaymentPaid(checkoutSessionId: string, payload: any) {
 
-        console.log('Looking for payment with checkoutSessionId:', checkoutSessionId);
-
         const payment = await this.prisma.paymentTransaction.findFirst({
             where: { checkoutSessionId },
             include: { order: true },
         });
-
-        console.log('Found payment:', payment);
 
         if (!payment) return;
 
