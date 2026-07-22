@@ -72,26 +72,6 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-console.log('========================');
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log(
-  'process.env.FRONTEND_SUCCESS_URL:',
-  process.env.FRONTEND_SUCCESS_URL,
-);
-console.log(
-  'config FRONTEND_SUCCESS_URL:',
-  configService.get('FRONTEND_SUCCESS_URL'),
-);
-console.log(
-  'config FRONTEND_FAILED_URL:',
-  configService.get('FRONTEND_FAILED_URL'),
-);
-console.log(
-  'PAYMONGO_SECRET_KEY:',
-  configService.get<string>('PAYMONGO_SECRET_KEY')?.substring(0, 12) + '...',
-);
-console.log('========================');
-
   await app.listen(3001);
 }
 
