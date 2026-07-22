@@ -58,6 +58,25 @@ export class PaymentService {
 
         const gateway = await this.createGatewaySession(order, dto.paymentMethod);
 
+        console.log('========================');
+        console.log('Gateway Response');
+        console.log('Provider:', gateway.provider);
+        console.log('Checkout Session:', gateway.checkoutSessionId);
+        console.log('Redirect URL:', gateway.redirectUrl);
+
+        if (gateway.rawResponse?.data?.attributes) {
+        console.log(
+            'PayMongo Success URL:',
+            gateway.rawResponse.data.attributes.success_url,
+        );
+        console.log(
+            'PayMongo Cancel URL:',
+            gateway.rawResponse.data.attributes.cancel_url,
+        );
+        }
+
+        console.log('========================');
+
         const data = {
             orderId: order.id,
             attemptNo,
