@@ -28,6 +28,7 @@ import { SellerDashboardModule } from './seller-dashboard/seller-dashboard.modul
 import { AiModule } from './modules/ai/ai.module';
 import { BrandsModule } from './modules/brands/brands.module';
 import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
+import { LoggerModule } from './common/logger/logger.module';
 
 
 @Module({
@@ -39,6 +40,7 @@ import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
         '.env'
       ]
     }),
+    LoggerModule,
     PrismaModule, 
     CartModule, 
     AuthModule, 
