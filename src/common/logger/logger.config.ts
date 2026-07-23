@@ -8,12 +8,12 @@ export const loggerConfig: Params = {
             : {
                 target: 'pino-pretty',
                 options: {
-                singleLine: true,
-                colorize: true,
-                translateTime: 'SYS:standard',
+                    singleLine: true,
+                    colorize: true,
+                    translateTime: 'SYS:standard',
                 },
             },
 
-    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+        level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
     },
 };
