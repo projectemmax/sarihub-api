@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -28,6 +28,8 @@ import { SellerDashboardModule } from './seller-dashboard/seller-dashboard.modul
 import { AiModule } from './modules/ai/ai.module';
 import { BrandsModule } from './modules/brands/brands.module';
 import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
+import { LoggerModule } from './common/logger/logger.module';
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 
 @Module({
@@ -39,6 +41,7 @@ import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
         '.env'
       ]
     }),
+    LoggerModule,
     PrismaModule, 
     CartModule, 
     AuthModule, 
@@ -66,4 +69,10 @@ import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
   controllers: [AppController, LocationController],
   providers: [AppService, LocationService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes('*');
+  }
+}
