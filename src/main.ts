@@ -8,9 +8,15 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { ConfigService } from '@nestjs/config';
 import * as bodyParser from 'body-parser';
+import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(
+    AppModule,
+    {
+      bufferLogs: true,
+    },
+  );
 
   app.enableCors({
     origin: [
@@ -72,7 +78,11 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  await app.listen(3001);
+  const port = configService.get<number>('PORT', 3001);
+
+  app.useLogger(app.get(Logger));
+
+  await app.listen(port);
 }
 
 bootstrap();
