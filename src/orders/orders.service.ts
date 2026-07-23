@@ -94,8 +94,6 @@ export class OrdersService {
             include: { items: true },
         });
 
-        console.log(order);
-
         if (!order) {
             throw new NotFoundException('Order not found');
         }
