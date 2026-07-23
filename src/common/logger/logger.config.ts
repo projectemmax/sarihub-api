@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Params } from 'nestjs-pino';
 
 export const loggerConfig: Params = {
@@ -28,6 +29,10 @@ export const loggerConfig: Params = {
             remove: true,
         },
 
+        genReqId(req) {
+            return req.headers['x-request-id'] ?? randomUUID();
+        },
+
         serializers: {
             req(req) {
                 return {
@@ -44,6 +49,7 @@ export const loggerConfig: Params = {
                 };
             },
         },
+
 
     },
 };
